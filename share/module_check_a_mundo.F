@@ -3026,6 +3026,88 @@
       ENDIF
 
 !-----------------------------------------------------------------------
+! wvt: When bl_pbl_physics=0 (e.g. SMS-3DTKE), the diffusion module handles
+! vertical mixing. Warn if scalar_pblmix/tracer_pblmix are 0, since scalars
+! and tracers won't be vertically mixed without them.
+!-----------------------------------------------------------------------
+      DO i = 1, model_config_rec % max_dom
+         IF ( .NOT. model_config_rec % grid_allowed(i) ) CYCLE
+         IF ( model_config_rec % bl_pbl_physics(i) .EQ. 0 ) THEN
+            IF ( model_config_rec % scalar_pblmix(i) .EQ. 0 ) THEN
+               wrf_err_message = '--- WARNING: bl_pbl_physics=0 with scalar_pblmix=0: scalars will not be vertically mixed'
+               CALL wrf_message ( wrf_err_message )
+            END IF
+            IF ( model_config_rec % tracer_pblmix(i) .EQ. 0 .AND. &
+                 model_config_rec % tracer_opt(i) .GT. 0 ) THEN
+               wrf_err_message = '--- WARNING: bl_pbl_physics=0 with tracer_pblmix=0: tracers will not be vertically mixed'
+               CALL wrf_message ( wrf_err_message )
+            END IF
+         END IF
+      ENDDO
+
+!-----------------------------------------------------------------------
+! wvt: WVT -- Check that moisture tracer schemes are compatible
+! When tracer_opt=4, only schemes with WVT tracer support are allowed.
+! Update these checks when adding WVT support to additional schemes.
+!-----------------------------------------------------------------------
+      DO i = 1, model_config_rec % max_dom
+         IF ( .NOT. model_config_rec % grid_allowed(i) ) CYCLE
+         IF ( model_config_rec % tracer_opt(i) .EQ. 4 ) THEN
+
+            IF ( model_config_rec % mp_physics(i) .NE. 6 ) THEN
+               wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) requires mp_physics=6 (WSM6)'
+               CALL wrf_message ( wrf_err_message )
+               count_fatal_error = count_fatal_error + 1
+            END IF
+
+            IF ( model_config_rec % bl_pbl_physics(i) .NE. 1 .AND. &
+                 model_config_rec % bl_pbl_physics(i) .NE. 0 ) THEN
+               wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) requires bl_pbl_physics=1 (YSU) or 0'
+               CALL wrf_message ( wrf_err_message )
+               count_fatal_error = count_fatal_error + 1
+            END IF
+
+            IF ( model_config_rec % cu_physics(i) .NE. 1 .AND. &
+                 model_config_rec % cu_physics(i) .NE. 11 .AND. &
+                 model_config_rec % cu_physics(i) .NE. 16 .AND. &
+                 model_config_rec % cu_physics(i) .NE. 0 ) THEN
+               wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) requires cu_physics=1 (KF), 11 (MSKF), 16 (NTiedtke), or 0'
+               CALL wrf_message ( wrf_err_message )
+               count_fatal_error = count_fatal_error + 1
+            END IF
+
+! wvt: scalar_pblmix/tracer_pblmix depends on PBL scheme:
+!   bl_pbl_physics=1 (YSU): must be 0 (YSU handles mixing internally)
+!   bl_pbl_physics=0 (SMS-3DTKE): must be 1 (diffusion module handles mixing)
+            IF ( model_config_rec % bl_pbl_physics(i) .GT. 0 ) THEN
+               IF ( model_config_rec % scalar_pblmix(i) .NE. 0 ) THEN
+                  wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) with PBL scheme requires scalar_pblmix=0'
+                  CALL wrf_message ( wrf_err_message )
+                  count_fatal_error = count_fatal_error + 1
+               END IF
+               IF ( model_config_rec % tracer_pblmix(i) .NE. 0 ) THEN
+                  wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) with PBL scheme requires tracer_pblmix=0'
+                  CALL wrf_message ( wrf_err_message )
+                  count_fatal_error = count_fatal_error + 1
+               END IF
+            ELSE
+               IF ( model_config_rec % tracer_pblmix(i) .NE. 1 ) THEN
+                  wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) with bl_pbl_physics=0 requires tracer_pblmix=1'
+                  CALL wrf_message ( wrf_err_message )
+                  count_fatal_error = count_fatal_error + 1
+               END IF
+            END IF
+
+            IF ( model_config_rec % tracer_adv_opt(i) .NE. 4 ) THEN
+               wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) requires tracer_adv_opt=4'
+               CALL wrf_message ( wrf_err_message )
+               count_fatal_error = count_fatal_error + 1
+            END IF
+
+         END IF
+      ENDDO
+
+!-----------------------------------------------------------------------
 !  MUST BE AFTER ALL OF THE PHYSICS CHECKS.
 !-----------------------------------------------------------------------
 
