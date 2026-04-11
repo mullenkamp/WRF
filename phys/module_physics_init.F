@@ -33,11 +33,14 @@ CONTAINS
                          RUCUTEN, RVCUTEN,                       &
                          RTHCUTEN, RQVCUTEN, RQRCUTEN,           &
                          RQCCUTEN, RQSCUTEN, RQICUTEN,           &
+                         RTRQVCUTEN, RTRQRCUTEN,                 &   ! wvt: tracer
+                         RTRQCCUTEN, RTRQSCUTEN, RTRQICUTEN,     &   ! wvt: tracer
                          RUSHTEN,  RVSHTEN,  RTHSHTEN,           &
                          RQVSHTEN, RQRSHTEN, RQCSHTEN,           &
                          RQSSHTEN, RQISHTEN, RQGSHTEN,           &
                          RUBLTEN,RVBLTEN,RTHBLTEN,               &
                          RQVBLTEN,RQCBLTEN,RQIBLTEN,             &
+                         RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,       &   ! wvt: tracer
                          RTHRATEN,RTHRATENLW,RTHRATENSW,         &
                          this_is_an_ideal_run,                   &
 #if ( EM_CORE == 1 )
@@ -50,6 +53,7 @@ CONTAINS
                          STEPBL,STEPRA,STEPCU,                   &
                          W0AVG, RAINNC, RAINC, RAINCV, RAINNCV,  &
                          SNOWNC, SNOWNCV, GRAUPELNC, GRAUPELNCV, &
+                         TR_RAINNC, TR_RAINC,TR_SNOWNC,TR_GRAUPELNC, &  ! wvt: tracer
                          z_at_q, inv_dens, qnwfa2d, qnbca2d,     & ! G. Thompson
                          scalar, num_sc,                         & ! G. Thompson
                          re_cloud, re_ice, re_snow,              & ! G. Thompson
@@ -267,6 +271,7 @@ CONTAINS
                          ,G_URB2D_mosaic,RN_URB2D_mosaic                                                      & ! danli mosaic 
                          ,TS_URB2D_mosaic                                                                     & ! danli mosaic 
                          ,TS_RUL2D_mosaic                                                                     & ! danli mosaic
+                         ,trmask                               & ! wvt: land mask for ET source for tracers
                          ,irr_rand_field,irr_ph,irr_freq                                                      &
 #if ( EM_CORE == 1 )
                          ,QR_CU,QS_CU,NC_CU,NI_CU,NR_CU,NS_CU,CCN_CU              & ! TWG
@@ -428,6 +433,9 @@ CONTAINS
              RQSCUTEN, RQICUTEN,                                       &
              RUSHTEN, RVSHTEN, RTHSHTEN, RQVSHTEN, RQRSHTEN, RQCSHTEN, &
              RQSSHTEN, RQISHTEN, RQGSHTEN
+! wvt: tracer
+   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(OUT) :: &
+             RTRQVCUTEN, RTRQRCUTEN, RTRQCCUTEN, RTRQSCUTEN, RTRQICUTEN
 #if ( EM_CORE == 1 )
    !BSINGH - For WRFCuP scheme
    REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) :: &
@@ -451,6 +459,10 @@ CONTAINS
    REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(OUT) ::           &
              RAINNC, RAINC, RAINCV, RAINNCV,  &
              SNOWNC, SNOWNCV, GRAUPELNC, GRAUPELNCV
+! wvt: tracer
+   REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(OUT) ::           &
+             TR_RAINNC, TR_RAINC, TR_SNOWNC, TR_GRAUPELNC
+
    REAL,     DIMENSION(ims:ime,kms:kme,jms:jme), INTENT(IN) :: z_at_q            !  G. Thompson
    REAL,     DIMENSION(ims:ime,kms:kme,jms:jme), INTENT(IN) :: inv_dens          !  G. Thompson
    REAL,     DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: qnwfa2d, qnbca2d       !  G. Thompson
@@ -469,6 +481,11 @@ CONTAINS
 
   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) ::    & !BSINGH(PNNL)- should be declared inout
              RUBLTEN,RVBLTEN,RTHBLTEN,RQVBLTEN,RQCBLTEN,RQIBLTEN,EXCH_H,TKE_PBL
+
+! wvt: tracer
+   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(OUT) ::    &
+             RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN
+
   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT), OPTIONAL :: QKE,pek,pep
 
   REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(OUT), OPTIONAL :: &
@@ -824,6 +841,10 @@ CONTAINS
 ! WA 2/22/11
    REAL,OPTIONAL, DIMENSION( ims:ime , jms:jme ) , &
           INTENT(OUT) ::    wm_temf
+
+! wvt
+   REAL, DIMENSION( ims:ime , jms:jme ), INTENT(OUT) :: trmask
+! wvt
 
    REAL, OPTIONAL, DIMENSION( ims:ime , jms:jme ) , &
           INTENT(  OUT) ::    pblmax, clddpthb, cldtopb, rainsh, rainshvb, &
@@ -1347,6 +1368,19 @@ CHARACTER(LEN=8) :: name
                 its, ite, jts, jte, kts, kte                       )
    ENDIF
 
+! wvt: if tracing ET moisture, inicialize terrain mask to select the
+! source area and tendencies
+
+    !IF(config_flags%tracer_opt == 3)THEN
+    !   CALL tracer_mask_init(id,XLAND,XLAT,XLONG,TRMASK,               &
+    !                       RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,           &
+    !                       RTRQVCUTEN, RTRQRCUTEN,                     &
+    !                       RTRQCCUTEN, RTRQSCUTEN, RTRQICUTEN,         &
+    !                       ids, ide, jds, jde, kds, kde,               &
+    !                       ims, ime, jms, jme, kms, kme,               &
+    !                       its, ite, jts, jte, kts, kte               )
+    !ENDIF
+
   ENDIF !}
 
 !-- convert zfull and zhalf to sigma values for ra_init (Eta CO2 needs these)
@@ -1424,7 +1458,7 @@ CHARACTER(LEN=8) :: name
 
    CALL wrf_debug ( 200 , 'module_start: phy_init: Before call to bl_init' )
    CALL bl_init(STEPBL,BLDT,DT,RUBLTEN,RVBLTEN,RTHBLTEN,        &
-                RQVBLTEN,RQCBLTEN,RQIBLTEN,TSK,TMN,             &
+                RQVBLTEN,RQCBLTEN,RQIBLTEN,RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,TSK,TMN,& ! wvt
                 config_flags,restart,UST,LOWLYR,TSLB,ZS,DZS,    &
                 num_soil_layers,TKE_PBL,mfshconv,pek,pep,       &
                 massflux_EDKF, entr_EDKF, detr_EDKF, & 
@@ -1594,7 +1628,8 @@ CHARACTER(LEN=8) :: name
 
    CALL cu_init(DX,STEPCU,CUDT,DT,RUCUTEN,RVCUTEN,RTHCUTEN,     &
                 RQVCUTEN,RQRCUTEN,RQCCUTEN,RQSCUTEN,RQICUTEN,   &
-                NCA,RAINC,RAINCV,W0AVG,config_flags,restart,    &
+                RTRQVCUTEN, RTRQCCUTEN, RTRQRCUTEN, RTRQICUTEN, RTRQSCUTEN, & ! wvt
+                NCA,RAINC,RAINCV,TR_RAINC,W0AVG,config_flags,restart,    & ! wvt
                 CLDEFI,LOWLYR,                                  &
                 MASS_FLUX,RTHFTEN,RQVFTEN,                      &
 #if ( EM_CORE == 1 )
@@ -1634,7 +1669,8 @@ CHARACTER(LEN=8) :: name
 
    CALL wrf_debug ( 200 , 'module_start: phy_init: Before call to mp_init' )
 
-   CALL mp_init(RAINNC,SNOWNC,GRAUPELNC,config_flags,restart,warm_rain,          &
+   CALL mp_init(RAINNC,TR_RAINNC,SNOWNC,TR_SNOWNC,GRAUPELNC,TR_GRAUPELNC, & ! wvt
+                config_flags,restart,warm_rain,          &
                 adv_moist_cond,                                 &
                 MPDT, DT, DX, DY, LOWLYR,                       &
                 F_ICE_PHY,F_RAIN_PHY,F_RIMEF_PHY,               &
@@ -2459,7 +2495,7 @@ CHARACTER(LEN=8) :: name
    END SUBROUTINE ra_init
 
    SUBROUTINE bl_init(STEPBL,BLDT,DT,RUBLTEN,RVBLTEN,RTHBLTEN,  &
-                RQVBLTEN,RQCBLTEN,RQIBLTEN,TSK,TMN,             &
+                RQVBLTEN,RQCBLTEN,RQIBLTEN,RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,TSK,TMN, & ! wvt
                 config_flags,restart,UST,LOWLYR,TSLB,ZS,DZS,    &
                 num_soil_layers,TKE_PBL,mfshconv,pek,pep,       &
                 massflux_EDKF, entr_EDKF, detr_EDKF, & 
@@ -2750,6 +2786,9 @@ CHARACTER(LEN=8) :: name
                                                           RQVBLTEN, &
                                                           RQCBLTEN, &
                                                           RQIBLTEN, &
+                                                        RTRQVBLTEN, &
+                                                        RTRQCBLTEN, &
+                                                        RTRQIBLTEN, &
                                                           TKE_PBL
 
    REAL,     DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT), OPTIONAL :: QKE, pek, pep
@@ -3701,6 +3740,7 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
       CASE (YSUSCHEME)
            if(isfc .ne. 1)CALL wrf_error_fatal &
             ( 'module_physics_init: Use sf_sfclay_physics= 1 or 91 for this pbl option' )
+! wvt: ysuinit_tr removed - 4.7.1 YSU init does not need tracer-specific initialization
       CASE (SHINHONGSCHEME)
            if(isfc .ne. 1)CALL wrf_error_fatal &
             ( 'module_physics_init: Use sf_sfclay_physics= 1 or 91 for this pbl option' )
@@ -3922,7 +3962,8 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
 !==================================================================
    SUBROUTINE cu_init(DX,STEPCU,CUDT,DT,RUCUTEN,RVCUTEN,RTHCUTEN,  &
                       RQVCUTEN,RQRCUTEN,RQCCUTEN,RQSCUTEN,RQICUTEN,&
-                      NCA,RAINC,RAINCV,W0AVG,config_flags,restart, &
+                      RTRQVCUTEN, RTRQCCUTEN, RTRQRCUTEN, RTRQICUTEN, RTRQSCUTEN, & ! wvt
+                      NCA,RAINC,RAINCV,TR_RAINC,W0AVG,config_flags,restart, & ! wvt
                       CLDEFI,LOWLYR,                               &
                       MASS_FLUX, RTHFTEN, RQVFTEN,                 &
 #if ( EM_CORE == 1 )
@@ -3978,15 +4019,16 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
 
    REAL ,   DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) ::    &    
             RUCUTEN, RVCUTEN, RTHCUTEN, RQVCUTEN, RQCCUTEN,                &
-            RQRCUTEN, RQICUTEN, RQSCUTEN
+            RQRCUTEN, RQICUTEN, RQSCUTEN,                                  &
+            RTRQVCUTEN, RTRQCCUTEN, RTRQRCUTEN, RTRQICUTEN, RTRQSCUTEN     ! wvt: tracer
 #if ( EM_CORE == 1 )
    !BSINGH - For WRFCuP Scheme
-   REAL ,   DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) ::    &    
+   REAL ,   DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) ::    &
         cldfra_cup,cldfratend_cup                               !CuP, wig 18-Sep-2006
    !BSINGH -ENDS
 #endif
 
-   REAL ,   DIMENSION( ims:ime , kms:kme , jms:jme ) , OPTIONAL, INTENT(INOUT) ::    &    
+   REAL ,   DIMENSION( ims:ime , kms:kme , jms:jme ) , OPTIONAL, INTENT(INOUT) ::    &
                         cugd_tten,cugd_ttens,cugd_qvten,            &    
                         cugd_qvtens,cugd_qcten, RQCNCUTEN, RQINCUTEN
 
@@ -3996,6 +4038,8 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
             RTHFTEN, RQVFTEN
 
    REAL ,   DIMENSION( ims:ime , jms:jme ), INTENT(OUT):: RAINC, RAINCV
+
+   REAL ,   DIMENSION( ims:ime , jms:jme ), INTENT(OUT):: TR_RAINC   ! wvt: tracer
 
    REAL ,   DIMENSION( ims:ime , jms:jme ), INTENT(OUT):: CLDEFI
 #if ( EM_CORE == 1 )
@@ -4034,6 +4078,7 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
      DO i=its,itf
         RAINC(i,j)=0.
         RAINCV(i,j)=0.
+        TR_RAINC(i,j)=0.! wvt
      ENDDO
      ENDDO
    ENDIF
@@ -4059,8 +4104,12 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
                       its, ite, jts, jte, kts, kte                )
 
      CASE (KFETASCHEME)
+! wvt: native WVT integration - tracer tendency args passed to kf_eta_init
           CALL kf_eta_init(RTHCUTEN,RQVCUTEN,RQCCUTEN,RQRCUTEN,   &
-                      RQICUTEN,RQSCUTEN,NCA,W0AVG,P_QI,P_QS,      &
+                      RQICUTEN,RQSCUTEN,                           &
+                      RTRQVCUTEN,RTRQCCUTEN,RTRQRCUTEN,            & ! wvt
+                      RTRQICUTEN,RTRQSCUTEN,                       & ! wvt
+                      NCA,W0AVG,P_QI,P_QS,P_QI_TR,P_QS_TR,        & ! wvt
                       SVP1,SVP2,SVP3,SVPT0,                       &
                       PARAM_FIRST_SCALAR,restart,                 &
                       allowed_to_read ,                           &
@@ -4070,8 +4119,12 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
 
 #if ( EM_CORE == 1 )
      CASE (MSKFSCHEME)
+! wvt: native WVT integration - tracer tendency args passed to mskf_init
           CALL mskf_init(RTHCUTEN,RQVCUTEN,RQCCUTEN,RQRCUTEN,     &
-                      RQICUTEN,RQSCUTEN,NCA,W0AVG,P_QI,P_QS,      &
+                      RQICUTEN,RQSCUTEN,                           &
+                      RTRQVCUTEN,RTRQCCUTEN,RTRQRCUTEN,            & ! wvt
+                      RTRQICUTEN,RTRQSCUTEN,                       & ! wvt
+                      NCA,W0AVG,P_QI,P_QS,P_QI_TR,P_QS_TR,        & ! wvt
                       SVP1,SVP2,SVP3,SVPT0,                       &
                       PARAM_FIRST_SCALAR,restart,                 &
                       allowed_to_read ,                           &
@@ -4362,7 +4415,8 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
    END SUBROUTINE shcu_init
 
 !==================================================================
-   SUBROUTINE mp_init(RAINNC,SNOWNC,GRAUPELNC,config_flags,restart,warm_rain,      &
+   SUBROUTINE mp_init(RAINNC,TR_RAINNC,SNOWNC,TR_SNOWNC,GRAUPELNC,TR_GRAUPELNC, & ! wvt
+                      config_flags,restart,warm_rain,      &
                       adv_moist_cond,                             &
                       MPDT, DT, DX, DY, LOWLYR,                   & ! for eta mp
                       F_ICE_PHY,F_RAIN_PHY,F_RIMEF_PHY,           & ! for eta mp
@@ -4430,7 +4484,7 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
                                   its, ite, jts, jte, kts, kte
 
    INTEGER , DIMENSION( ims:ime , jms:jme ) ,INTENT(INOUT)  :: LOWLYR
-   REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(INOUT) :: RAINNC,SNOWNC,GRAUPELNC
+   REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(INOUT) :: RAINNC,TR_RAINNC,SNOWNC,TR_SNOWNC,GRAUPELNC,TR_GRAUPELNC ! wvt
    REAL,     DIMENSION( ims:ime , kms:kme, jms:jme ) , INTENT(INOUT) :: &
                                   F_ICE_PHY,F_RAIN_PHY,F_RIMEF_PHY
 #if ( EM_CORE == 1 )
@@ -4471,10 +4525,13 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
         RAINNC(i,j) = 0.
         SNOWNC(i,j) = 0.
         GRAUPELNC(i,j) = 0.
+        TR_RAINNC(i,j) = 0.   ! wvt
+        TR_SNOWNC(i,j) = 0.   ! wvt
+        TR_GRAUPELNC(i,j) = 0. ! wvt
      ENDDO
      ENDDO
    ENDIF
-   
+
    mp_select: SELECT CASE(config_flags%mp_physics)
 
      CASE (KESSLERSCHEME)
@@ -4488,6 +4545,7 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
      CASE (WSM5SCHEME)
           CALL wsm5init(rhoair0,rhowater,rhosnow,cliq,cpv, allowed_to_read )
      CASE (WSM6SCHEME)
+! wvt: wsm6init_tr removed - 4.7.1 WSM6 init does not need tracer-specific initialization
           CALL mp_wsm6_init(rhoair0,rhowater,rhosnow,cliq,cpv,config_flags%hail_opt,errmsg,errflg)
      CASE (WSM7SCHEME)
           CALL wsm7init(rhoair0,rhowater,rhosnow,cliq,cpv, allowed_to_read )

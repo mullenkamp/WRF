@@ -859,7 +859,7 @@ module_cu_kfcup.o: \
 
 
 module_cu_kfeta.o: \
-	../frame/module_wrf_error.o 
+	../frame/module_wrf_error.o
 
 
 module_cu_gd.o: \

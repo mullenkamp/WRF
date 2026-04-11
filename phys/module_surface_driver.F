@@ -315,6 +315,7 @@ CONTAINS
      &          ,TS_RUL2D_mosaic                                      &  !danli mosaic     
      &          ,ZOL                                                  &  !ckay
      &          ,SDA_HFX, SDA_QFX, HFX_BOTH, QFX_BOTH, QNORM, fasdas  &  !fasdas
+     &          ,trqfx,trmask,tr_qv_curr,f_tr_qv                      &  ! wvt: for ET tracers
      &          ,spp_lsm,pattern_spp_lsm,field_sf                     &  !SPP
      &          ,spp_pbl,pattern_spp_pbl                              &  !SPP
      &          ,XLAIDYN                                              &
@@ -1431,6 +1432,13 @@ CONTAINS
    INTEGER , OPTIONAL , INTENT(IN)        :: id
 !
   real,    dimension(ims:ime,1:maxpatch,jms:jme ) ::  q_ref2m   ! clm
+
+! wvt: for ET tracers
+   REAL, DIMENSION( ims:ime, jms:jme ) , INTENT(INOUT)::   TRQFX
+   REAL, DIMENSION( ims:ime, jms:jme ) , INTENT(IN) :: TRMASK
+   REAL, DIMENSION( ims:ime, kms:kme, jms:jme ),                 &
+         OPTIONAL, INTENT(IN) ::   tr_qv_curr
+   LOGICAL, INTENT(IN), OPTIONAL ::   f_tr_qv
 
   real,  intent(inout),optional :: t_veg24(ims:ime,1:maxpatch,jms:jme)      ! voce accum variables
   real,  intent(inout),optional :: t_veg240(ims:ime,1:maxpatch,jms:jme)
@@ -4360,6 +4368,28 @@ CONTAINS
        ENDIF
 
      END SELECT sfc_select
+
+! wvt: tracer source region
+       IF ( PRESENT( tr_qv_curr ) ) THEN
+           DO j=j_start(ij),j_end(ij)
+           DO i=i_start(ij),i_end(ij)
+              IF(TRMASK(i,j).gt.0.)THEN
+                 IF(QFX(i,j).ge.0.)THEN
+                      TRQFX(i,j)=QFX(i,j)
+                 ELSE
+                      TRQFX(I,J)=QFX(i,j)*min(max(TR_QV_CURR(i,1,j)/QV_CURR(i,1,j),0.),1.)
+                 ENDIF
+              ELSE
+                 IF(QFX(i,j).ge.0.)THEN
+                      TRQFX(i,j)=0.
+                 ELSE
+                      TRQFX(I,J)=QFX(i,j)*min(max(TR_QV_CURR(i,1,j)/QV_CURR(i,1,j),0.),1.)
+                 ENDIF
+              ENDIF
+           ENDDO
+           ENDDO
+       ENDIF
+! wvt
 
      ENDDO
      !$OMP END PARALLEL DO

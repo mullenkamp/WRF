@@ -26,7 +26,7 @@ MODULE module_physics_addtendc
 CONTAINS
 
 SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
-                      scalar_tendf,mu_tendf,                                &
+                      scalar_tendf,mu_tendf,tracer_tendf,                   & !wvt
                       RTHRATEN,RTHBLTEN,RTHCUTEN,RTHSHTEN,                  &
                       RUBLTEN,RUCUTEN,RUSHTEN,                              &
                       RVBLTEN,RVCUTEN,RVSHTEN,                              &
@@ -38,6 +38,8 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       RUNDGDTEN,RVNDGDTEN,RTHNDGDTEN,RPHNDGDTEN,            &
                       RQVNDGDTEN,RMUNDGDTEN,                                &
                       rthfrten,rqvfrten,                                    & !fire
+                      RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,n_tracer,               & !wvt
+                      RTRQVCUTEN,RTRQCCUTEN,RTRQRCUTEN,RTRQICUTEN,RTRQSCUTEN,  & !wvt
                       ruiauten,rviauten,rthiauten,                          &
                       rqviauten,rqciauten,rqriauten,                        &
                       rqiiauten,rqsiauten,rqgiauten,                        &
@@ -55,7 +57,7 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
    INTEGER , INTENT(IN)        ::  ids, ide, jds, jde, kds, kde,   &
                                    ims, ime, jms, jme, kms, kme,   &
                                    its, ite, jts, jte, kts, kte,   &
-                                   n_moist,n_scalar,rk_step
+                                   n_moist,n_scalar,n_tracer,rk_step !wvt
 
    LOGICAL , INTENT(IN)        :: adv_moist_cond
 
@@ -72,6 +74,9 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
 
    REAL , DIMENSION(ims:ime, kms:kme, jms:jme, n_scalar),           &
           INTENT(INOUT)     ::                        scalar_tendf
+
+   REAL , DIMENSION(ims:ime, kms:kme, jms:jme, n_tracer),           & !wvt
+          INTENT(INOUT)     ::                        tracer_tendf
 
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   &
                                                        RTHRATEN, &
@@ -108,6 +113,14 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                                                      RQVNDGDTEN, &
                                                       RUNDGDTEN, &
                                                       RVNDGDTEN, &
+                                                     RTRQVBLTEN, & !wvt
+                                                     RTRQCBLTEN, &
+                                                     RTRQIBLTEN, &
+                                                     RTRQVCUTEN, &
+                                                     RTRQCCUTEN, &
+                                                     RTRQRCUTEN, &
+                                                     RTRQICUTEN, &
+                                                     RTRQSCUTEN, &
                                                        RUIAUTEN, &
                                                        RVIAUTEN, &
                                                       RPHIAUTEN, &
@@ -135,18 +148,20 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       ims, ime, jms, jme, kms, kme,            &
                       its, ite, jts, jte, kts, kte             )
 
-   if (config_flags%bl_pbl_physics .gt. 0)                     &
+   if (config_flags%bl_pbl_physics .gt. 0)                     & !wvt
       CALL phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,   &
                       rt_tendf,ru_tendf,rv_tendf,moist_tendf,  &
                       scalar_tendf,adv_moist_cond,             &
+                      tracer_tendf,n_tracer,                   &
                       RTHBLTEN,RUBLTEN,RVBLTEN,                &
                       RQVBLTEN,RQCBLTEN,RQIBLTEN,              &
                       RQNIBLTEN,                               &! For CAMUWPBL
+                      RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,        &
                       ids, ide, jds, jde, kds, kde,            &
                       ims, ime, jms, jme, kms, kme,            &
                       its, ite, jts, jte, kts, kte             )
 
-   if (config_flags%cu_physics .gt. 0)                         &
+   if (config_flags%cu_physics .gt. 0)                         & !wvt
       CALL phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,   &
                       rt_tendf,ru_tendf,rv_tendf,              &
                       RUCUTEN,RVCUTEN,RTHCUTEN,                &
@@ -154,6 +169,9 @@ SUBROUTINE update_phy_ten(rph_tendf,rt_tendf,ru_tendf,rv_tendf,moist_tendf, &
                       RQICUTEN,RQSCUTEN,RQCNCUTEN,RQINCUTEN,   &
                       moist_tendf,                             &
                       scalar_tendf,adv_moist_cond,             &
+                      tracer_tendf,n_tracer,                   &
+                      RTRQVCUTEN,RTRQCCUTEN,RTRQRCUTEN,        &
+                      RTRQICUTEN,RTRQSCUTEN,                   &
                       ids, ide, jds, jde, kds, kde,            &
                       ims, ime, jms, jme, kms, kme,            &
                       its, ite, jts, jte, kts, kte             )
@@ -234,11 +252,13 @@ SUBROUTINE phy_ra_ten(config_flags,rt_tendf,RTHRATEN,            &
 END SUBROUTINE phy_ra_ten
 
 !=================================================================
-SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     &
+SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     & !wvt
                       rt_tendf,ru_tendf,rv_tendf,moist_tendf,    &
                       scalar_tendf,adv_moist_cond,               &
-                      RTHBLTEN,RUBLTEN,RVBLTEN,                  & 
+                      tracer_tendf,n_tracer,                     &
+                      RTHBLTEN,RUBLTEN,RVBLTEN,                  &
                       RQVBLTEN,RQCBLTEN,RQIBLTEN,RQNIBLTEN,      &
+                      RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,          &
                       ids, ide, jds, jde, kds, kde,              &
                       ims, ime, jms, jme, kms, kme,              &
                       its, ite, jts, jte, kts, kte               )
@@ -250,7 +270,7 @@ SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     &
    INTEGER , INTENT(IN)        ::  ids, ide, jds, jde, kds, kde, &
                                    ims, ime, jms, jme, kms, kme, &
                                    its, ite, jts, jte, kts, kte, &
-                                   n_moist, n_scalar, rk_step
+                                   n_moist, n_scalar, rk_step ,n_tracer !wvt
 
    LOGICAL , INTENT(IN)     :: adv_moist_cond
 
@@ -260,7 +280,10 @@ SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     &
    REAL , DIMENSION(ims:ime, kms:kme, jms:jme, n_scalar),         &
           INTENT(INOUT)     ::                      scalar_tendf
 
-   REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   & 
+   REAL , DIMENSION(ims:ime, kms:kme, jms:jme, n_tracer),         & !wvt
+          INTENT(INOUT)     ::                      tracer_tendf
+
+   REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   &
                                                        RTHBLTEN, &
                                                         RUBLTEN, &
                                                         RVBLTEN, &
@@ -268,6 +291,11 @@ SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     &
                                                        RQCBLTEN, &
                                                        RQIBLTEN, &
                                                       RQNIBLTEN
+
+   REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   & !wvt
+                                                       RTRQVBLTEN, &
+                                                       RTRQCBLTEN, &
+                                                       RTRQIBLTEN
 
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(INOUT)::   &
                                                        rt_tendf, &
@@ -319,6 +347,28 @@ SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     &
                 ims, ime, jms, jme, kms, kme,                    &
                 its, ite, jts, jte, kts, kte                     )
 
+        if (P_QV_TR .ge. PARAM_FIRST_SCALAR)                                           & !wvt
+           CALL add_a2a(tracer_tendf(ims,kms,jms,P_QV_TR),RTRQVBLTEN,  &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QC_TR .ge. PARAM_FIRST_SCALAR)                                           & !wvt
+           CALL add_a2a(tracer_tendf(ims,kms,jms,P_QC_TR),RTRQCBLTEN,  &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QI_TR .ge. PARAM_FIRST_SCALAR)                                           & !wvt
+           CALL add_a2a(tracer_tendf(ims,kms,jms,P_QI_TR),RTRQIBLTEN,  &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+
        IF(.not. adv_moist_cond)THEN
 
         if (P_QT .ge. PARAM_FIRST_SCALAR)                                         &
@@ -327,7 +377,7 @@ SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     &
                 ids,ide, jds, jde, kds, kde,                     &
                 ims, ime, jms, jme, kms, kme,                    &
                 its, ite, jts, jte, kts, kte                     )
-     
+
         if (P_QT .ge. PARAM_FIRST_SCALAR)                                         &
            CALL add_a2a(scalar_tendf(ims,kms,jms,P_QT),RQIBLTEN,  &
                 config_flags,                                    &
@@ -1070,13 +1120,16 @@ SUBROUTINE phy_bl_ten(config_flags,rk_step,n_moist,n_scalar,     &
 END SUBROUTINE phy_bl_ten
 
 !=================================================================
-SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
+SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     & !wvt
                       rt_tendf,ru_tendf,rv_tendf,                &
                       RUCUTEN,RVCUTEN,RTHCUTEN,                  &
                       RQVCUTEN,RQCCUTEN,RQRCUTEN,                &
                       RQICUTEN,RQSCUTEN,RQCNCUTEN,RQINCUTEN,     &
                       moist_tendf,                               &
                       scalar_tendf,adv_moist_cond,               &
+                      tracer_tendf,n_tracer,                     &
+                      RTRQVCUTEN,RTRQCCUTEN,RTRQRCUTEN,          &
+                      RTRQICUTEN,RTRQSCUTEN,                     &
                       ids, ide, jds, jde, kds, kde,              &
                       ims, ime, jms, jme, kms, kme,              &
                       its, ite, jts, jte, kts, kte               )
@@ -1088,7 +1141,7 @@ SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
    INTEGER , INTENT(IN)        ::  ids, ide, jds, jde, kds, kde, &
                                    ims, ime, jms, jme, kms, kme, &
                                    its, ite, jts, jte, kts, kte, &
-                                   n_moist, n_scalar, rk_step
+                                   n_moist, n_scalar, rk_step ,n_tracer !wvt
 
    LOGICAL , INTENT(IN)     :: adv_moist_cond
 
@@ -1097,6 +1150,9 @@ SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
 
    REAL , DIMENSION(ims:ime, kms:kme, jms:jme, n_scalar),         &
           INTENT(INOUT)     ::                      scalar_tendf
+
+   REAL , DIMENSION(ims:ime, kms:kme, jms:jme, n_tracer),         & !wvt
+          INTENT(INOUT)     ::                      tracer_tendf
 
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   &
                                                         RUCUTEN, &
@@ -1109,6 +1165,13 @@ SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
                                                        RQSCUTEN, &
                                                       RQCNCUTEN, &
                                                       RQINCUTEN
+
+   REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(IN  ) ::   & !wvt
+                                                       RTRQVCUTEN, &
+                                                       RTRQCCUTEN, &
+                                                       RTRQRCUTEN, &
+                                                       RTRQICUTEN, &
+                                                       RTRQSCUTEN
 
    REAL, DIMENSION(ims:ime, kms:kme, jms:jme), INTENT(INOUT) ::  &
                                                        rt_tendf, &
@@ -1250,6 +1313,41 @@ SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
                 ims, ime, jms, jme, kms, kme,                    &
                 its, ite, jts, jte, kts, kte                     )
 
+        if (P_QV_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QV_TR),RTRQVCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QC_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QC_TR),RTRQCCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QR_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QR_TR),RTRQRCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QI_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QI_TR),RTRQICUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QS_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QS_TR),RTRQSCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
        IF(.not. adv_moist_cond)THEN
 
         if (P_QT .ge. PARAM_FIRST_SCALAR)                        &
@@ -1297,7 +1395,7 @@ SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
                 ids,ide, jds, jde, kds, kde,                     &
                 ims, ime, jms, jme, kms, kme,                    &
                 its, ite, jts, jte, kts, kte                     )
- 
+
         if (P_QV .ge. PARAM_FIRST_SCALAR)                                         &
         CALL add_a2a(moist_tendf(ims,kms,jms,P_QV),RQVCUTEN,     &
                 config_flags,                                    &
@@ -1328,6 +1426,41 @@ SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
 
         if (P_QS .ge. PARAM_FIRST_SCALAR)                                         &
         CALL add_a2a(moist_tendf(ims,kms,jms,P_QS),RQSCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QV_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QV_TR),RTRQVCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QC_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QC_TR),RTRQCCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QR_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QR_TR),RTRQRCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QI_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QI_TR),RTRQICUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QS_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QS_TR),RTRQSCUTEN,     &
                 config_flags,                                    &
                 ids,ide, jds, jde, kds, kde,                     &
                 ims, ime, jms, jme, kms, kme,                    &
@@ -1612,6 +1745,27 @@ SUBROUTINE phy_cu_ten(config_flags,rk_step,n_moist,n_scalar,     &
 
         if (P_QI .ge. PARAM_FIRST_SCALAR)                                         &
         CALL add_a2a(moist_tendf(ims,kms,jms,P_QI),RQICUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QV_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QV_TR),RTRQVCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QC_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QC_TR),RTRQCCUTEN,     &
+                config_flags,                                    &
+                ids,ide, jds, jde, kds, kde,                     &
+                ims, ime, jms, jme, kms, kme,                    &
+                its, ite, jts, jte, kts, kte                     )
+
+        if (P_QI_TR .ge. PARAM_FIRST_SCALAR)                                      & ! wvt
+        CALL add_a2a(tracer_tendf(ims,kms,jms,P_QI_TR),RTRQICUTEN,     &
                 config_flags,                                    &
                 ids,ide, jds, jde, kds, kde,                     &
                 ims, ime, jms, jme, kms, kme,                    &
@@ -2209,7 +2363,10 @@ END SUBROUTINE phy_fr_ten
 SUBROUTINE advance_ppt(RTHCUTEN,RQVCUTEN,RQCCUTEN,RQRCUTEN,           &
                      CLDFRA_CUP,                                      &     ! add LD 01/11/2012 !BSINGH -  Added for CuP
                      RQICUTEN,RQSCUTEN,                               &
+                     RTRQVCUTEN,RTRQCCUTEN,RTRQRCUTEN,                &        !wvt
+                     RTRQICUTEN,RTRQSCUTEN,                           &        !wvt
                      RAINC,RAINCV,RAINSH,PRATEC,PRATESH,  &
+                     TR_RAINC,TR_PRATEC,                    &       !wvt
                      NCA, HTOP,HBOT,CUTOP,CUBOT,                      &
                      CUPPT, DT, config_flags,                         &
                      ids,ide, jds,jde, kds,kde,                       &
@@ -2242,11 +2399,22 @@ SUBROUTINE advance_ppt(RTHCUTEN,RQVCUTEN,RQCCUTEN,RQRCUTEN,           &
                                                        RQSCUTEN, &
                                                        CLDFRA_CUP        ! add LD 01/11/2012 !BSINGH - For CuP
 
+ !wvt
+   REAL, DIMENSION( ims:ime, kms:kme, jms:jme ),                 &
+         INTENT(INOUT)  ::                                       &
+                                                     RTRQVCUTEN, &
+                                                     RTRQCCUTEN, &
+                                                     RTRQRCUTEN, &
+                                                     RTRQICUTEN, &
+                                                     RTRQSCUTEN
+
    REAL, DIMENSION( ims:ime , jms:jme ),                         &
           INTENT(INOUT) ::                                RAINC, &
+                                                       TR_RAINC, &    !wvt
                                                          RAINSH, &
                                                          RAINCV, &
                                                          PRATEC, &
+                                                      TR_PRATEC, &    !wvt
                                                         PRATESH, &
                                                             NCA, &
                                                            HTOP, &
@@ -2289,6 +2457,7 @@ SUBROUTINE advance_ppt(RTHCUTEN,RQVCUTEN,RQCCUTEN,RQRCUTEN,           &
    DO J = j_start,j_end
    DO i = i_start,i_end
       RAINC(I,J)  = RAINC(I,J) + PRATEC(I,J)*DT
+      TR_RAINC(I,J)  = TR_RAINC(I,J) + TR_PRATEC(I,J)*DT   !wvt
       RAINSH(I,J) = RAINSH(I,J) + PRATESH(I,J)*DT
       CUPPT(I,J)  = CUPPT(I,J) + (PRATEC(I,J)+PRATESH(I,J))*DT/1000.
    ENDDO
@@ -2372,6 +2541,15 @@ SUBROUTINE advance_ppt(RTHCUTEN,RQVCUTEN,RQCCUTEN,RQRCUTEN,           &
                     RQRCUTEN(i,k,j)=0.
                     if (P_QI .ge. PARAM_FIRST_SCALAR) RQICUTEN(i,k,j)=0.
                     if (P_QS .ge. PARAM_FIRST_SCALAR) RQSCUTEN(i,k,j)=0.
+
+! wvt: tracers
+                    RTRQVCUTEN(i,k,j)=0.
+                    RTRQCCUTEN(i,k,j)=0.
+                    RTRQRCUTEN(i,k,j)=0.
+                    if (P_QI_TR .ge. PARAM_FIRST_SCALAR) RTRQICUTEN(i,k,j)=0.
+                    if (P_QS_TR .ge. PARAM_FIRST_SCALAR) RTRQSCUTEN(i,k,j)=0.
+! wvt
+
                  ENDDO
               ENDIF
 
