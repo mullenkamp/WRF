@@ -7,6 +7,7 @@
     USE module_state_description, only: p_m23, p_m13, p_m22, p_m33, p_r23, p_r13, p_r12, p_m12, p_m11, &
                                         P_QNS, P_QNR, P_QNG, P_QT, P_QNH, P_QVOLG ! XZ
     USE module_big_step_utilities_em, only: grid_config_rec_type, param_first_scalar, p_qv, p_qi, p_qc
+    USE module_state_description, only: p_qv_tr  ! wvt
     USE module_model_constants
 
     CONTAINS
@@ -4016,6 +4017,7 @@ SUBROUTINE vertical_diffusion_2   ( ru_tendf, rv_tendf, rw_tendf, rt_tendf,   &
                                     xkmv,xkhv,xkmh,km_opt,                    & ! xkmh added
                                     fnm, fnp, dn, dnw, rdz, rdzw,             &
                                     hfx, qfx, ust, rho,                       &
+                                    trqfx,                                    & ! wvt
                                     ids, ide, jds, jde, kds, kde,             &
                                     ims, ime, jms, jme, kms, kme,             &
                                     its, ite, jts, jte, kts, kte              )
@@ -4094,6 +4096,7 @@ SUBROUTINE vertical_diffusion_2   ( ru_tendf, rv_tendf, rw_tendf, rt_tendf,   &
    REAL , DIMENSION( ims:ime, jms:jme), INTENT(INOUT)            :: hfx,  &
                                                                     qfx
    REAL , DIMENSION( ims:ime, jms:jme), INTENT(IN   )            :: ust
+   REAL , DIMENSION( ims:ime, jms:jme), INTENT(IN)               :: trqfx  ! wvt - tracer surface flux
    REAL , DIMENSION( ims:ime, kms:kme, jms:jme), INTENT(INOUT) ::    thp
 
 ! LOCAL VAR
@@ -4425,6 +4428,19 @@ SUBROUTINE vertical_diffusion_2   ( ru_tendf, rv_tendf, rw_tendf, rt_tendf,   &
    IF (n_tracer .ge. PARAM_FIRST_SCALAR) THEN
 
      tracer_loop: do im = PARAM_FIRST_SCALAR, n_tracer
+
+!--- wvt: inject tracer surface flux BEFORE diffusion solver (matches moisture pattern)
+          IF (config_flags%tracer_opt .EQ. 4 .AND. im .EQ. P_QV_TR) THEN  ! wvt
+            trqflux: SELECT CASE( config_flags%isfflx )                    ! wvt
+            CASE (1,2)                                                     ! wvt
+              DO j = j_start, j_end                                        ! wvt
+              DO i = i_start, i_end                                        ! wvt
+                tracer_tendf(i,kts,j,im) = tracer_tendf(i,kts,j,im)      &! wvt
+                    -g*trqfx(i,j)/dnw(kts)                                 ! wvt
+              ENDDO                                                        ! wvt
+              ENDDO                                                        ! wvt
+            END SELECT trqflux                                             ! wvt
+          ENDIF                                                            ! wvt
 
           CALL vertical_diffusion_s( tracer_tendf(ims,kms,jms,im),         &
                                      config_flags, tracer(ims,kms,jms,im), &
@@ -7625,6 +7641,7 @@ END SUBROUTINE phy_bc
                                         xkmv,xkhv,xkmh,km_opt,                    &
                                         fnm, fnp, dn, dnw, rdz, rdzw,             &
                                         hfx, qfx, ust, rho,                       &
+                                        trqfx,                                    & ! wvt
                                         nlflux,gamu,gamv,xkmv_meso,l_diss,        &
                                         c1h, c2h, c1f, c2f,                       &
                                         ids, ide, jds, jde, kds, kde,             &
@@ -7714,6 +7731,7 @@ END SUBROUTINE phy_bc
 
    REAL , DIMENSION( ims:ime, jms:jme),          INTENT(INOUT)   :: hfx,  &
                                                                     qfx
+   REAL , DIMENSION( ims:ime, jms:jme), INTENT(IN   )            :: trqfx  ! wvt
 
    REAL , DIMENSION( ims:ime, jms:jme), INTENT(IN   )            :: ust
 
@@ -8402,8 +8420,13 @@ END SUBROUTINE phy_bc
              a(k) = 0.
              b(k) = 1.+rdz_w*(rdz(i,k+1,j)*xkxavg(i,k+1,j))*dt
              c(k) =   -rdz_w* rdz(i,k+1,j)*xkxavg(i,k+1,j)*dt
-             d(k) = var_mix(i,kts,j)
- 
+!--- wvt: inject tracer surface flux into RHS at bottom level
+             IF (config_flags%tracer_opt .EQ. 4 .AND. im .EQ. P_QV_TR) THEN  ! wvt
+               d(k) = var_mix(i,kts,j) + dt*rdz_w*trqfx(i,j)                 ! wvt
+             ELSE                                                              ! wvt
+               d(k) = var_mix(i,kts,j)                                         ! wvt
+             ENDIF                                                             ! wvt
+
            DO  k = kts+1,ktf-1
              rdz_w = -g/dnw(k)/(c1h(k)*mu(i,j)+c2h(k))
              a(k) = -rdz_w*rdz(i,k,j)*xkxavg(i,k,j)*dt
@@ -8411,14 +8434,14 @@ END SUBROUTINE phy_bc
              c(k) = -rdz_w*rdz(i,k+1,j)*xkxavg(i,k+1,j)*dt
              d(k) = var_mix(i,k,j)
            ENDDO
- 
+
              a(ktf) = 0.
              b(ktf) = 1.
              c(ktf) = 0.
              d(ktf) = var_mix(i,ktf,j)
- 
+
              CALL tridiag(nz,a,b,c,d)
- 
+
            DO k = kts, ktf
              tracer_tendf(i,k,j,im) = tracer_tendf(i,k,j,im) + (c1h(k)*mu(i,j)+c2h(k)) * (d(k) - var_mix(i,k,j))/dt
            ENDDO
