@@ -29,7 +29,11 @@
                 ,ids,ide,jds,jde,kds,kde                 &
                 ,ims,ime,jms,jme,kms,kme                 &
                 ,its,ite,jts,jte,kts,kte                 &
-                ,errmsg,errflg)
+                ,errmsg,errflg                           &
+                ,tr_qv_curr,tr_qc_curr,tr_qi_curr          & ! wvt
+                ,tr_pratec,tr_rainc                        & ! wvt
+                ,rtrqvcuten,rtrqccuten,rtrqicuten          & ! wvt
+                ,f_tr_qv)                                    ! wvt
 !=================================================================================================================
 !-- u3d         3d u-velocity interpolated to theta points (m/s)
 !-- v3d         3d v-velocity interpolated to theta points (m/s)
@@ -131,6 +135,20 @@
  character(len=*),intent(out):: errmsg
  integer,intent(out):: errflg
 
+!--- optional tracer arguments:                                                           ! wvt
+ real(kind=kind_phys),intent(in),dimension(ims:ime,kms:kme,jms:jme),optional:: &          ! wvt
+    tr_qv_curr,  &                                                                        ! wvt - INTENT(IN): state read only, tendencies returned
+    tr_qc_curr,  &                                                                        ! wvt - tracer cloud water (read only)
+    tr_qi_curr                                                                             ! wvt - tracer cloud ice (read only)
+ real(kind=kind_phys),intent(inout),dimension(ims:ime,kms:kme,jms:jme),optional:: &       ! wvt
+    rtrqvcuten,  &                                                                        ! wvt - tracer vapor tendency
+    rtrqccuten,  &                                                                        ! wvt - tracer cloud water tendency
+    rtrqicuten                                                                             ! wvt - tracer cloud ice tendency
+ real(kind=kind_phys),intent(inout),dimension(ims:ime,jms:jme),optional:: &                ! wvt
+    tr_pratec,   &                                                                        ! wvt
+    tr_rainc                                                                               ! wvt
+ logical,intent(in),optional:: f_tr_qv                                                     ! wvt
+
 !--- local variables and arrays:
  integer:: i,im,j,k,kx,kx1
  integer,dimension(its:ite)::  slimsk
@@ -152,10 +170,21 @@
  real(kind=kind_phys),dimension(its:ite,kts:kte):: rthcuten_hv,rqvcuten_hv,rqccuten_hv,rqicuten_hv, &
                                                    rucuten_hv,rvcuten_hv
 
+ logical:: l_do_tracers                                                                    ! wvt
+ real(kind=kind_phys),dimension(its:ite,kts:kte):: tr_qv_hv                                ! wvt
+ real(kind=kind_phys),dimension(its:ite,kts:kte):: tr_qc_hv, tr_qi_hv                     ! wvt
+ real(kind=kind_phys),dimension(its:ite):: tr_pratec_hv                                    ! wvt
+
 !-----------------------------------------------------------------------------------------------------------------
 
  errmsg = ' '
  errflg = 0
+
+!--- wvt: set tracer flag from PRESENT check
+ l_do_tracers = .false.                                                                    ! wvt
+ if (present(f_tr_qv)) then                                                                ! wvt
+    if (f_tr_qv) l_do_tracers = .true.                                                     ! wvt
+ endif                                                                                     ! wvt
 
  call cu_ntiedtke_init( &
                        con_cp  = cp  , con_rd = rd   , con_rv   = rv   , con_xlv = xlv    , &
@@ -202,6 +231,20 @@
        enddo
     enddo
 
+!--- wvt: pack 3D tracer arrays to 2D tile arrays (column-reversed for CCPP core)
+    if (l_do_tracers) then                                                                 ! wvt
+       do k = kts,kte                                                                      ! wvt
+          do i = its,ite                                                                   ! wvt
+             tr_qv_hv(i,kte-k+kts) = tr_qv_curr(i,k,j)                                   ! wvt
+             tr_qc_hv(i,kte-k+kts) = tr_qc_curr(i,k,j)                                   ! wvt
+             tr_qi_hv(i,kte-k+kts) = tr_qi_curr(i,k,j)                                   ! wvt
+          enddo                                                                            ! wvt
+       enddo                                                                               ! wvt
+       do i = its,ite                                                                      ! wvt
+          tr_pratec_hv(i) = 0.0                                                            ! wvt - zero before call, not accumulated
+       enddo                                                                               ! wvt
+    endif                                                                                  ! wvt
+
     call cu_ntiedtke_pre_run( &
                      its    = its       , ite     = ite     , kts     = kts     , kte       = kte       , &
                      im     = im        , kx      = kx      , kx1     = kx1     , itimestep = itimestep , &
@@ -222,7 +265,10 @@
                      poz  = ghtl   , pzz  = ghti   , pomg   = omg     , pap    = prsl    , &
                      paph = prsi   , evap = qfx_hv , hfx    = hfx_hv  , zprecc = rn      , &
                      lndj = slimsk , lq   = im     , km     = kx      , km1    = kx1     , &
-                     dt   = delt   , dx   = dx_hv  , errmsg = errmsg  , errflg = errflg    &
+                     dt   = delt   , dx   = dx_hv  , errmsg = errmsg  , errflg = errflg  , & ! wvt
+                     tr_qv = tr_qv_hv , tr_qc = tr_qc_hv , tr_qi = tr_qi_hv ,              & ! wvt
+                     tr_pratec = tr_pratec_hv ,                                             & ! wvt
+                     do_tracers = l_do_tracers                                               & ! wvt
                         )
 
     call cu_ntiedtke_post_run( &
@@ -269,6 +315,26 @@
           enddo
        endif
     endif
+
+!--- wvt: unpack tracer tile arrays back to 3D (reverse column order)
+!--- wvt: compute tendencies only -- do NOT modify state arrays in-place
+!--- wvt: state is advanced by the RK solver via tendency accumulation
+    if (l_do_tracers) then                                                                 ! wvt
+       do k = kts,kte                                                                      ! wvt
+          do i = its,ite                                                                   ! wvt
+             rtrqvcuten(i,k,j) = (tr_qv_hv(i,kte-k+kts) - tr_qv_curr(i,k,j)) &           ! wvt
+                                 / (dt*stepcu)                                              ! wvt
+             rtrqccuten(i,k,j) = (tr_qc_hv(i,kte-k+kts) - tr_qc_curr(i,k,j)) &           ! wvt
+                                 / (dt*stepcu)                                              ! wvt
+             rtrqicuten(i,k,j) = (tr_qi_hv(i,kte-k+kts) - tr_qi_curr(i,k,j)) &           ! wvt
+                                 / (dt*stepcu)                                              ! wvt
+          enddo                                                                            ! wvt
+       enddo                                                                               ! wvt
+       do i = its,ite                                                                      ! wvt
+          tr_rainc(i,j) = tr_rainc(i,j) + tr_pratec_hv(i)*dt                               ! wvt
+          tr_pratec(i,j) = tr_pratec_hv(i)                                                 ! wvt
+       enddo                                                                               ! wvt
+    endif                                                                                  ! wvt
 
  enddo
 
