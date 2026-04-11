@@ -41,6 +41,17 @@ state   real    tr_qs   ikjftb  tracer        1         -     irhusdf=(bdy_inter
 
 package   tracer_test1  tracer_opt==2       -             tracer:tr17_1,tr17_2,tr17_3,tr17_4,tr17_5,tr17_6,tr17_7,tr17_8
 
+#wvt: Tracers for water vapor
+#
+state   real    qv_tr     ikjftb  tracer        1         -     irh06usdf=(bdy_interp:dt)    "qv_tr"         "tracer for water vapor from ET (mix. ratio)"      "Kg Kg-1"
+state   real    qc_tr     ikjftb  tracer        1         -     irh06usdf=(bdy_interp:dt)    "qc_tr"         "tracer for cloud water from ET (mix. ratio)"      "Kg Kg-1"
+state   real    qr_tr     ikjftb  tracer        1         -     irh06usdf=(bdy_interp:dt)    "qr_tr"         "tracer for rain water from ET (mix. ratio)"       "Kg Kg-1"
+state   real    qi_tr     ikjftb  tracer        1         -     irh06usdf=(bdy_interp:dt)    "qi_tr"         "tracer for ice from ET (mix. ratio)"               "Kg Kg-1"
+state   real    qs_tr     ikjftb  tracer        1         -     irh06usdf=(bdy_interp:dt)    "qs_tr"         "tracer for snow from ET (mix. ratio)"          "Kg Kg-1"
+state   real    qg_tr     ikjftb  tracer        1         -     irh06usdf=(bdy_interp:dt)    "qg_tr"         "tracer for graupel from ET (mix. ratio)"    "Kg Kg-1"
+
+package   tracer_moist  tracer_opt==4       -             tracer:qv_tr,qc_tr,qr_tr,qi_tr,qs_tr,qg_tr
+
 package   restofwrf      use_wps_input==0            -             -
  
 package   realonly       use_wps_input==1            -            state:u_gc,v_gc,t_gc,rh_gc,ght_gc,p_gc,xlat_gc,xlong_gc,ht_gc,tsk_gc,tavgsfc,tmn_gc,pslv_gc,sct_dom_gc,scb_dom_gc,greenfrac,albedo12m,lai12m,pd_gc,psfc_gc,intq_gc,pdhs,sh_gc,cl_gc,cf_gc,qv_gc,qr_gc,qc_gc,qs_gc,qi_gc,qg_gc,qh_gc,qni_gc,qnc_gc,icefrac_gc,prho_gc,pdrho_gc,qnr_gc,qns_gc,qng_gc,qnh_gc,soil_layers,soil_levels,st,sm,sw,soilt,soilm,sm000007,sm007028,sm028100,sm100255,st000007,st007028,st028100,st100255,sm000010,sm010040,sm040100,sm100200,sm010200,soilm000,soilm005,soilm020,soilm040,soilm160,soilm300,sw000010,sw010040,sw040100,sw100200,sw010200,soilw000,soilw005,soilw020,soilw040,soilw160,soilw300,st000010,st010040,st040100,st100200,st010200,soilt000,soilt005,soilt020,soilt040,soilt160,soilt300,qntemp,qntemp2,hgtmaxw,pmaxw,tmaxw,umaxw,vmaxw,hgttrop,ptrop,ttrop,utrop,vtrop,urb_param
