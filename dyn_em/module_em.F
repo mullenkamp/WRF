@@ -18,7 +18,8 @@ MODULE module_em
   USE module_ieva_em, only: advect_u_implicit, advect_v_implicit, advect_w_implicit, advect_s_implicit, advect_ph_implicit, &
                             chk_ieva, ww_split, calc_mut_new
   USE module_state_description, only: param_first_scalar, p_qr, p_qv, p_qc, p_qg, p_qi, p_qs, tiedtkescheme,ntiedtkescheme, heldsuarez, &
-        positivedef, gdscheme, g3scheme, gfscheme, kfetascheme, mskfscheme, monotonic, wenopd_scalar, weno_scalar, weno_mom
+        positivedef, gdscheme, g3scheme, gfscheme, kfetascheme, mskfscheme, monotonic, wenopd_scalar, weno_scalar, weno_mom,  &
+        p_qr_tr, p_qv_tr, p_qc_tr, p_qg_tr, p_qi_tr, p_qs_tr ! wvt
 
    USE module_damping_em, only: held_suarez_damp
 
@@ -2081,9 +2082,12 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
                      RTHRATEN,                                         &
                      RUBLTEN,RVBLTEN,RTHBLTEN,                         &
                      RQVBLTEN,RQCBLTEN,RQIBLTEN,                       &
+                     RTRQVBLTEN,RTRQCBLTEN,RTRQIBLTEN,                 & ! wvt
                      RUCUTEN,RVCUTEN,RTHCUTEN,                         &
                      RQVCUTEN,RQCCUTEN,RQRCUTEN,                       &
                      RQICUTEN,RQSCUTEN,                                &
+                     RTRQVCUTEN,RTRQCCUTEN,RTRQRCUTEN,                 & ! wvt
+                     RTRQICUTEN,RTRQSCUTEN,                            & ! wvt
                      RUSHTEN,RVSHTEN,RTHSHTEN,                         &
                      RQVSHTEN,RQCSHTEN,RQRSHTEN,                       &
                      RQISHTEN,RQSSHTEN,RQGSHTEN,                       &
@@ -2149,7 +2153,12 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
                                                              RQRSHTEN, &
                                                              RQISHTEN, &
                                                              RQSSHTEN, &
-                                                             RQGSHTEN
+                                                             RQGSHTEN, &
+                                                           RTRQVCUTEN, & ! wvt
+                                                           RTRQCCUTEN, &
+                                                           RTRQRCUTEN, &
+                                                           RTRQICUTEN, &
+                                                           RTRQSCUTEN
 
 ! pbl
 
@@ -2159,7 +2168,10 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
                                                              RTHBLTEN, &
                                                              RQVBLTEN, &
                                                              RQCBLTEN, &
-                                                             RQIBLTEN
+                                                             RQIBLTEN, &
+                                                           RTRQVBLTEN, & ! wvt
+                                                           RTRQCBLTEN, &
+                                                           RTRQIBLTEN
 
 ! fdda
 
@@ -2302,6 +2314,60 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
          ENDDO
       ENDIF
 
+! wvt: tracers
+
+      IF (P_QV_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=jts,jtf
+         DO I=its,itf
+         DO K=kts,ktf
+            RTRQVCUTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQVCUTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QC_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=jts,jtf
+         DO I=its,itf
+         DO K=kts,ktf
+            RTRQCCUTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQCCUTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QR_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=jts,jtf
+         DO I=its,itf
+         DO K=kts,ktf
+            RTRQRCUTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQRCUTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QI_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=jts,jtf
+         DO I=its,itf
+         DO K=kts,ktf
+            RTRQICUTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQICUTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF(P_QS_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=jts,jtf
+         DO I=its,itf
+         DO K=kts,ktf
+            RTRQSCUTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQSCUTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+! wvt
+
    ENDIF
 
 ! shallow cumulus
@@ -2415,6 +2481,40 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
          ENDDO
       ENDIF
 
+! wvt: tracers
+
+      IF (P_QV_TR .ge. PARAM_FIRST_SCALAR) THEN
+         DO J=jts,jtf
+         DO K=kts,ktf
+         DO I=its,itf
+            RTRQVBLTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQVBLTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QC_TR .ge. PARAM_FIRST_SCALAR) THEN
+         DO J=jts,jtf
+         DO K=kts,ktf
+         DO I=its,itf
+           RTRQCBLTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQCBLTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QI_TR .ge. PARAM_FIRST_SCALAR) THEN
+         DO J=jts,jtf
+         DO K=kts,ktf
+         DO I=its,itf
+            RTRQIBLTEN(I,K,J)=(c1(k)*mut(I,J)+c2(k))*RTRQIBLTEN(I,K,J)
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+! wvt
+
     ENDIF
 
 ! fdda
@@ -2472,6 +2572,7 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
 
 ! 4d couple scalar tendencies that have only uncoupled physics tendencies at this point
 
+ IF(config_flags%scalar_pblmix .GT. 0)THEN ! wvt
    DO im = PARAM_FIRST_SCALAR,num_scalar
          DO J=jts,jtf
          DO K=kts,ktf
@@ -2481,7 +2582,9 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
          ENDDO
          ENDDO
    ENDDO
+ ENDIF
 
+ IF(config_flags%tracer_pblmix .GT. 0)THEN ! wvt
    DO im = PARAM_FIRST_SCALAR,num_tracer
          DO J=jts,jtf
          DO K=kts,ktf
@@ -2491,6 +2594,7 @@ SUBROUTINE calculate_phy_tend (config_flags,c1,c2,                     &
          ENDDO
          ENDDO
    ENDDO
+ ENDIF
 
 ! IAU (Incremental Analysis Updates)
 

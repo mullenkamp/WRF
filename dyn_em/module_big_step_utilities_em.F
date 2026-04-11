@@ -15,7 +15,8 @@ MODULE module_big_step_utilities_em
 
    USE module_model_constants
    USE module_state_description, only: p_qg, p_qs, p_qi, gdscheme, tiedtkescheme, ntiedtkescheme, kfetascheme, mskfscheme, &
-       g3scheme, gfscheme,p_qv, param_first_scalar, p_qr, p_qc, DFI_FWD
+       g3scheme, gfscheme,p_qv, param_first_scalar, p_qr, p_qc, DFI_FWD, &
+       p_qv_tr, p_qc_tr, p_qi_tr, p_qr_tr, p_qs_tr !wvt
    USE module_configure, ONLY : grid_config_rec_type
    USE module_wrf_error
 
@@ -4732,12 +4733,16 @@ END SUBROUTINE pole_point_bc
                          c1h, c2h, c1f, c2f,                          &
                          u, v, p, pb, alt, ph,                        &  ! input
                          phb, t, moist, n_moist,                      &  ! input
+                         tracer, n_tracer,                            &  ! wvt
+                         itimestep, dt,                               &  ! gmm & are
                          rho, th_phy, th_phy_m_t0,                    &  ! output
                          p_phy , pi_phy ,                             &  ! output
                          u_phy, v_phy, p8w, t_phy, t8w,               &  ! output
                          z, z_at_w, dz8w,                             &  ! output
                          p_hyd, p_hyd_w, dnw,                         &  ! output
                          fzm, fzp, znw, p_top,                        &  ! params
+                         thum_u_phy_dt, thum_v_phy_dt,                &  ! gmm & are
+                         tr_thum_u_phy_dt, tr_thum_v_phy_dt,          &  ! wvt
                          ids, ide, jds, jde, kds, kde,                &
                          ims, ime, jms, jme, kms, kme,                &
                          its, ite, jts, jte, kts, kte                )
@@ -4751,8 +4756,20 @@ END SUBROUTINE pole_point_bc
                                        ims, ime, jms, jme, kms, kme, &
                                        its, ite, jts, jte, kts, kte
    INTEGER ,          INTENT(IN   ) :: n_moist
+   INTEGER ,          INTENT(IN   ) :: n_tracer ! wvt
+
+   INTEGER ,        INTENT(IN   ) :: itimestep ! gmm & are
+
+   REAL,          INTENT(IN    )  :: dt ! gmm & are
+
 
    REAL, DIMENSION( ims:ime, kms:kme , jms:jme , n_moist ), INTENT(IN) :: moist
+
+   REAL, DIMENSION( ims:ime, kms:kme , jms:jme , n_tracer ), INTENT(IN) :: tracer ! wvt
+
+   REAL, DIMENSION( ims:ime, kms:kme , jms:jme ),INTENT(INOUT) :: thum_u_phy_dt, thum_v_phy_dt ! gmm & are
+
+   REAL, DIMENSION( ims:ime, kms:kme , jms:jme ),INTENT(INOUT) :: tr_thum_u_phy_dt, tr_thum_v_phy_dt ! wvt
 
 
    REAL , DIMENSION( ims:ime, jms:jme ), INTENT(IN   )   ::     mut, muu, muv
@@ -4860,6 +4877,28 @@ END SUBROUTINE pole_point_bc
     enddo
     enddo
     enddo
+
+! gmm & are: call calc_moist_fluxes to compute moisture fluxes
+
+   CALL calc_moist_fluxes(   dt, itimestep, moist, n_moist,    &
+                             thum_u_phy_dt, thum_v_phy_dt,     &
+                             t_phy, p_phy, u_phy, v_phy,       &
+                             ids, ide, jds, jde, kds, kde,     &
+                             ims, ime, jms, jme, kms, kme,     &
+                             its, ite, jts, jte, kts, kte  )
+
+! wvt
+
+ IF (n_tracer .ge. PARAM_FIRST_SCALAR) THEN
+   CALL calc_moist_fluxes(   dt, itimestep, tracer, n_tracer,    &
+                             tr_thum_u_phy_dt, tr_thum_v_phy_dt,     &
+                             t_phy, p_phy, u_phy, v_phy,       &
+                             ids, ide, jds, jde, kds, kde,     &
+                             ims, ime, jms, jme, kms, kme,     &
+                             its, ite, jts, jte, kts, kte  )
+ ENDIF
+
+! gmm & are
 
 !  compute z at w points
 
@@ -4986,6 +5025,9 @@ END SUBROUTINE phy_prep
                          RUCUTEN,  RVCUTEN,  RTHCUTEN,                &
                          RQVCUTEN, RQCCUTEN, RQRCUTEN,                &
                          RQICUTEN, RQSCUTEN,                          &
+                         RTRQVBLTEN, RTRQCBLTEN, RTRQIBLTEN,          &  ! wvt
+                         RTRQVCUTEN, RTRQCCUTEN, RTRQRCUTEN,          &  ! wvt
+                         RTRQICUTEN, RTRQSCUTEN,                      &  ! wvt
                          RUSHTEN,  RVSHTEN,  RTHSHTEN,                &
                          RQVSHTEN, RQCSHTEN, RQRSHTEN,                &
                          RQISHTEN, RQSSHTEN, RQGSHTEN,                &
@@ -5037,6 +5079,20 @@ END SUBROUTINE phy_prep
                                                            RQVBLTEN, &
                                                            RQCBLTEN, &
                                                            RQIBLTEN
+
+! wvt: now tracers
+
+   REAL,  DIMENSION( ims:ime , kms:kme, jms:jme ),                   &
+          INTENT(INOUT)   ::                             RTRQVCUTEN, &
+                                                         RTRQCCUTEN, &
+                                                         RTRQRCUTEN, &
+                                                         RTRQICUTEN, &
+                                                         RTRQSCUTEN, &
+                                                         RTRQVBLTEN, &
+                                                         RTRQCBLTEN, &
+                                                         RTRQIBLTEN
+
+! wvt
 
    REAL,  DIMENSION( ims:ime, kms:kme, jms:jme )                   , &
           INTENT(INOUT)   ::                                RTHFTEN, &
@@ -5164,6 +5220,60 @@ END SUBROUTINE phy_prep
          ENDDO
       ENDIF
 
+!wvt: now tracers
+
+      IF (P_QV_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+            RTRQVCUTEN(I,K,J)=RTRQVCUTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QC_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+            RTRQCCUTEN(I,K,J)=RTRQCCUTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QR_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+            RTRQRCUTEN(I,K,J)=RTRQRCUTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QI_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+            RTRQICUTEN(I,K,J)=RTRQICUTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF(P_QS_TR .ge. PARAM_FIRST_SCALAR)THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+            RTRQSCUTEN(I,K,J)=RTRQSCUTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+!wvt
+
    ENDIF
 
    IF (config_flags%shcu_physics .gt. 0) THEN
@@ -5281,6 +5391,40 @@ END SUBROUTINE phy_prep
          ENDDO
          ENDDO
       ENDIF
+
+!wvt: now tracers
+
+      IF (P_QV_TR .ge. PARAM_FIRST_SCALAR) THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+            RTRQVBLTEN(I,K,J)=RTRQVBLTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QC_TR .ge. PARAM_FIRST_SCALAR) THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+           RTRQCBLTEN(I,K,J)=RTRQCBLTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+      IF (P_QI_TR .ge. PARAM_FIRST_SCALAR) THEN
+         DO J=j_start,j_end
+         DO K=k_start,k_end
+         DO I=i_start,i_end
+            RTRQIBLTEN(I,K,J)=RTRQIBLTEN(I,K,J)/(c1(k)*MUT(I,J)+c2(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+
+!wvt
 
     ENDIF
 
@@ -6108,6 +6252,88 @@ END SUBROUTINE set_tend
 !-----------------------------------------------------------------------
 
     END SUBROUTINE rk_rayleigh_damp
+
+!==============================================================================
+!==============================================================================
+
+! gmm & are: subroutine calc_moist_fluxes
+
+SUBROUTINE calc_moist_fluxes(   dt, itimestep, moist, n_moist,    &
+                                thum_u_phy_dt, thum_v_phy_dt,     &
+                                t_phy, p_phy, u_phy, v_phy,       &
+                                ids, ide, jds, jde, kds, kde,     &
+                                ims, ime, jms, jme, kms, kme,     &
+                                its, ite, jts, jte, kts, kte  )
+
+   IMPLICIT NONE
+
+   ! Input data
+
+   INTEGER ,          INTENT(IN   ) :: ids, ide, jds, jde, kds, kde, &
+                                       ims, ime, jms, jme, kms, kme, &
+                                       its, ite, jts, jte, kts, kte
+
+   INTEGER ,          INTENT(IN   ) :: n_moist, itimestep
+
+   REAL, DIMENSION( ims:ime , kms:kme , jms:jme , n_moist ), INTENT(IN   ) :: moist
+
+   REAL, DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(IN   ) :: t_phy, p_phy, u_phy, v_phy
+
+   REAL, DIMENSION( ims:ime , kms:kme , jms:jme ) , INTENT(INOUT) :: thum_u_phy_dt, thum_v_phy_dt
+
+   ! Local stuff
+
+   REAL ,     INTENT(IN   ) :: dt
+
+   REAL :: thum
+
+   INTEGER :: i, j, k, itf, jtf, ktf, ispe
+
+!<DESCRIPTION>
+!
+!calc_moist_fluxes computes dry density and total humidity in order to
+!get the x and y moisture fluxes
+!
+!</DESCRIPTION>
+
+     itf=MIN(ite,ide-1)
+     jtf=MIN(jte,jde-1)
+     ktf=MIN(kte,kde-1)
+
+     IF (itimestep == 1) THEN
+
+       DO j=jts,jtf
+       DO k=kts,ktf
+       DO i=its,itf
+            thum_u_phy_dt(i,k,j)=0.
+            thum_v_phy_dt(i,k,j)=0.
+       ENDDO
+       ENDDO
+       ENDDO
+
+     END IF
+
+     IF(  n_moist >= PARAM_FIRST_SCALAR ) THEN
+
+        DO j=jts,jtf
+        DO k=kts,ktf
+        DO i=its,itf
+            thum = 0.
+!DEC$ loop count(3)
+            DO ispe=PARAM_FIRST_SCALAR,n_moist
+               thum = thum + moist(i,k,j,ispe)
+            ENDDO
+            thum_u_phy_dt(i,k,j)=thum_u_phy_dt(i,k,j)+thum*u_phy(i,k,j)*dt
+            thum_v_phy_dt(i,k,j)=thum_v_phy_dt(i,k,j)+thum*v_phy(i,k,j)*dt
+        ENDDO
+        ENDDO
+        ENDDO
+
+      END IF
+
+END SUBROUTINE calc_moist_fluxes
+
+! gmm & are
 
 !==============================================================================
 !==============================================================================

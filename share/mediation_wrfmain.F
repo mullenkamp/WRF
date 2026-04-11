@@ -110,6 +110,37 @@ use module_io
        ENDIF
 !gmm
 
+!wvt: add input for tracer 3D region source here
+
+     IF ( config_flags%tracer_opt.eq.4 .and. (config_flags%tracer3dsource.eq.1 .or.  config_flags%tracer2dsource.eq.1 .or.  config_flags%tracer3dsink.eq.1) ) THEN
+
+        CALL construct_filename2a ( inpname , config_flags%auxinput8_inname &
+                                 ,grid%id , 2 , timestr)
+
+     if( grid%auxinput8_oid .NE. 0 ) then
+       CALL close_dataset ( grid%auxinput8_oid , config_flags , "DATASET=AUXINPUT8" )
+     endif
+
+        CALL open_r_dataset ( grid%auxinput8_oid, TRIM(inpname) , grid , config_flags , "DATASET=AUXINPUT8", ierr )
+
+!        call set_first_operation(grid%auxinput8_oid)
+
+
+        IF ( ierr .NE. 0 ) THEN
+          WRITE( wrf_err_message , * ) 'program wrf: error opening ',TRIM(inpname),' for reading ierr=',ierr
+          CALL WRF_ERROR_FATAL ( wrf_err_message )
+        ENDIF
+
+           CALL wrf_debug              (   0 , 'med_initialdata_input: calling input_aux_model_input8' )
+           CALL input_auxinput8 ( grid%auxinput8_oid ,   grid , config_flags , ierr )
+           CALL wrf_debug              ( 100 , 'med_initialdata_input: back from input_aux_model_input8' )
+
+        CALL close_dataset ( grid%auxinput8_oid , config_flags , "DATASET=AUXINPUT8" )
+
+       ENDIF
+
+!wvt
+
 #ifdef MOVE_NESTS
 #if ( EM_CORE == 1 )
         grid%nest_pos = grid%ht

@@ -3565,7 +3565,10 @@ BENCH_START(advance_ppt_tim)
      CALL advance_ppt(grid%rthcuten,grid%rqvcuten,grid%rqccuten,grid%rqrcuten, &
                       grid%cldfra_cup,                                         & !BSINGH -  Added for CuP scheme
                       grid%rqicuten,grid%rqscuten,           &
+                      grid%rtrqvcuten,grid%rtrqccuten,grid%rtrqrcuten, &   !wvt
+                      grid%rtrqicuten,grid%rtrqscuten,           &         !wvt
                       grid%rainc,grid%raincv,grid%rainsh,grid%pratec,grid%pratesh, &
+                      grid%tr_rainc,grid%tr_pratec, &    !wvt
                       grid%nca,grid%htop,grid%hbot,grid%cutop,grid%cubot,  &
                       grid%cuppt, grid%dt, config_flags,                   &
                       ids,ide, jds,jde, kds,kde,             &
@@ -3591,6 +3594,9 @@ BENCH_END(advance_ppt_tim)
                         grid%rucuten,  grid%rvcuten,  grid%rthcuten,     &
                         grid%rqvcuten, grid%rqccuten, grid%rqrcuten,     &
                         grid%rqicuten, grid%rqscuten,                    &
+                        grid%rtrqvblten, grid%rtrqcblten, grid%rtrqiblten, & !wvt
+                        grid%rtrqvcuten, grid%rtrqccuten, grid%rtrqrcuten, & !wvt
+                        grid%rtrqicuten, grid%rtrqscuten,                  & !wvt
                         grid%rushten,  grid%rvshten,  grid%rthshten,     &
                         grid%rqvshten, grid%rqcshten, grid%rqrshten,     &
                         grid%rqishten, grid%rqsshten, grid%rqgshten,     &
@@ -3832,6 +3838,14 @@ BENCH_START(micro_driver_tim)
       &        , QIP_CURR=moist(ims,kms,jms,P_QIP), F_QIP=F_QIP               &
       &        , QID_CURR=moist(ims,kms,jms,P_QID), F_QID=F_QID               &
       &        , QNDROP_CURR=scalar(ims,kms,jms,P_QNDROP), F_QNDROP=F_QNDROP &
+      &        , TR_QV_CURR=tracer(ims,kms,jms,P_QV_TR), F_TR_QV=F_QV_TR         &  ! wvt: moisture tracers
+      &        , TR_QC_CURR=tracer(ims,kms,jms,P_QC_TR), F_TR_QC=F_QC_TR     &
+      &        , TR_QR_CURR=tracer(ims,kms,jms,P_QR_TR), F_TR_QR=F_QR_TR     &
+      &        , TR_QI_CURR=tracer(ims,kms,jms,P_QI_TR), F_TR_QI=F_QI_TR     &
+      &        , TR_QS_CURR=tracer(ims,kms,jms,P_QS_TR), F_TR_QS=F_QS_TR     &
+      &        , TR_QG_CURR=tracer(ims,kms,jms,P_QG_TR), F_TR_QG=F_QG_TR     &
+      &        , TR_RAINNC=grid%tr_rainnc, TR_SNOWNC=grid%tr_snownc       &
+      &        , TR_GRAUPELNC=grid%tr_graupelnc                           &
 #if (WRF_CHEM == 1)
       &        , RAINPROD=wetscav_frcing(ims,kms,jms,p_rainprod)          &
       &        , EVAPPROD=wetscav_frcing(ims,kms,jms,p_evapprod)          &
@@ -4382,6 +4396,66 @@ BENCH_END(moist_phys_end_tim)
 !-----------------------------------------------------------
 !  end filter for chem and scalar variables at end of timestep
 !-----------------------------------------------------------
+
+! wvt: now make tracer moisture variables equal to the full moisture species in the the source region, if specified
+
+     IF ( config_flags%tracer3dsource == 1 ) then
+       DO jj = jps, MIN(jpe,jde-1)
+         DO kk = kps, MIN(kpe,kde-1)
+           DO ii = ips, MIN(ipe,ide-1)
+             if(grid%trmask3d(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QV_TR)=moist(ii,kk,jj,P_QV)
+             if(grid%trmask3d(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QC_TR)=moist(ii,kk,jj,P_QC)
+             if(grid%trmask3d(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QR_TR)=moist(ii,kk,jj,P_QR)
+             if(grid%trmask3d(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QI_TR)=moist(ii,kk,jj,P_QI)
+             if(grid%trmask3d(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QS_TR)=moist(ii,kk,jj,P_QS)
+             if(grid%trmask3d(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QG_TR)=moist(ii,kk,jj,P_QG)
+           ENDDO
+         ENDDO
+       ENDDO
+     ENDIF
+
+!old
+!     IF ( num_moist >= PARAM_FIRST_SCALAR .and. config_flags%tracer3dsource == 1 ) then
+!       tracer_source_loop: DO im = PARAM_FIRST_SCALAR, num_moist
+!         DO jj = jps, MIN(jpe,jde-1)
+!           DO kk = kps, MIN(kpe,kde-1)
+!             DO ii = ips, MIN(ipe,ide-1)
+!               if(grid%trmask3d(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,im)=moist(ii,kk,jj,im)
+!             ENDDO
+!           ENDDO
+!         ENDDO
+!       ENDDO tracer_source_loop
+!     ENDIF
+
+! wvt: now make moist tracer variables equal to zero in the secondary trmask3d (trmask3d2 => the sink region), if specified
+
+     IF ( config_flags%tracer3dsink == 1 ) then
+       DO jj = jps, MIN(jpe,jde-1)
+         DO kk = kps, MIN(kpe,kde-1)
+           DO ii = ips, MIN(ipe,ide-1)
+             if(grid%trmask3d2(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QV_TR)=0.
+             if(grid%trmask3d2(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QC_TR)=0.
+             if(grid%trmask3d2(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QR_TR)=0.
+             if(grid%trmask3d2(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QI_TR)=0.
+             if(grid%trmask3d2(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QS_TR)=0.
+             if(grid%trmask3d2(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,P_QG_TR)=0.
+           ENDDO
+         ENDDO
+       ENDDO
+     ENDIF
+
+!old
+!     IF ( num_moist >= PARAM_FIRST_SCALAR .and. config_flags%tracer3dsink == 1 ) then
+!       tracer_source_loop2: DO im = PARAM_FIRST_SCALAR, num_moist
+!         DO jj = jps, MIN(jpe,jde-1)
+!           DO kk = kps, MIN(kpe,kde-1)
+!             DO ii = ips, MIN(ipe,ide-1)
+!               if(grid%trmask3d2(ii,kk,jj).gt.0.5)tracer(ii,kk,jj,im)=0.
+!             ENDDO
+!           ENDDO
+!         ENDDO
+!       ENDDO tracer_source_loop2
+!     ENDIF
 
    !  We're finished except for boundary condition (and patch) update
 
