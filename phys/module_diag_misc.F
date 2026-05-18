@@ -46,6 +46,8 @@ CONTAINS
                      ,history_interval                                &
                      ,itimestep                                       &
                      ,cu_used, shcu_used, acc_phy_tend                &
+                     ,TR_RAINC,TR_RAINNC                               & ! Optional (WVT)
+                     ,I_TR_RAINC,I_TR_RAINNC                           & ! Optional (WVT)
                                                                       )
 !----------------------------------------------------------------------
 
@@ -199,6 +201,12 @@ CONTAINS
    REAL, DIMENSION( ims:ime, jms:jme ), OPTIONAL, INTENT(INOUT) ::&
                       PREC_ACC_C, PREC_ACC_NC, SNOW_ACC_NC
 
+   ! WVT tracer bucketed accumulators (optional, engaged when BUCKET_MM > 0)
+   REAL, DIMENSION( ims:ime, jms:jme ), OPTIONAL, INTENT(INOUT) ::&
+                      TR_RAINC, TR_RAINNC
+   INTEGER, DIMENSION( ims:ime, jms:jme ), OPTIONAL, INTENT(INOUT) ::&
+                      I_TR_RAINC, I_TR_RAINNC
+
    REAL, OPTIONAL, INTENT(IN)::  PREC_ACC_DT, CURR_SECS2
 
    INTEGER :: i,j,k,its,ite,jts,jte,ij
@@ -317,8 +325,45 @@ CONTAINS
           rainc(i,j) = rainc(i,j) - bucket_mm
           i_rainc(i,j) =  i_rainc(i,j) + 1
         ENDIF
-      ENDDO      
       ENDDO
+      ENDDO
+
+      ! WVT tracer precip bucket wrap — mirrors the RAINC/RAINNC block above.
+      IF (PRESENT(TR_RAINNC) .AND. PRESENT(I_TR_RAINNC)) THEN
+        IF (xtime .eq. 0.0) THEN
+          DO j=j_start(ij),j_end(ij)
+          DO i=i_start(ij),i_end(ij)
+            i_tr_rainnc(i,j) = 0
+          ENDDO
+          ENDDO
+        ENDIF
+        DO j=j_start(ij),j_end(ij)
+        DO i=i_start(ij),i_end(ij)
+          IF (tr_rainnc(i,j) .gt. bucket_mm) THEN
+            tr_rainnc(i,j)   = tr_rainnc(i,j) - bucket_mm
+            i_tr_rainnc(i,j) = i_tr_rainnc(i,j) + 1
+          ENDIF
+        ENDDO
+        ENDDO
+      ENDIF
+
+      IF (PRESENT(TR_RAINC) .AND. PRESENT(I_TR_RAINC)) THEN
+        IF (xtime .eq. 0.0) THEN
+          DO j=j_start(ij),j_end(ij)
+          DO i=i_start(ij),i_end(ij)
+            i_tr_rainc(i,j) = 0
+          ENDDO
+          ENDDO
+        ENDIF
+        DO j=j_start(ij),j_end(ij)
+        DO i=i_start(ij),i_end(ij)
+          IF (tr_rainc(i,j) .gt. bucket_mm) THEN
+            tr_rainc(i,j)   = tr_rainc(i,j) - bucket_mm
+            i_tr_rainc(i,j) = i_tr_rainc(i,j) + 1
+          ENDIF
+        ENDDO
+        ENDDO
+      ENDIF
 
       IF (xtime .eq. 0.0 .and. bucket_J .gt. 0.0 .and. PRESENT(ACSWUPT))THEN
         DO j=j_start(ij),j_end(ij)

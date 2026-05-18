@@ -394,6 +394,9 @@ CONTAINS
                 ,cu_used=grid%cu_used                                &
                 ,shcu_used=grid%shcu_used                            &
                 ,acc_phy_tend=grid%acc_phy_tend                      &
+      ! WVT tracer bucketed accumulators
+                ,TR_RAINC=grid%tr_rainc, TR_RAINNC=grid%tr_rainnc    &
+                ,I_TR_RAINC=grid%i_tr_rainc, I_TR_RAINNC=grid%i_tr_rainnc &
       ! Dimension arguments
                 ,IDS=ids,IDE=ide, JDS=jds,JDE=jde, KDS=kds,KDE=kde   &
                 ,IMS=ims,IME=ime, JMS=jms,JME=jme, KMS=kms,KME=kme   &
