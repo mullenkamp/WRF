@@ -70,7 +70,7 @@ PROGRAM ndown_em
               nims, nime, njms, njme, nkms, nkme,    &
               nips, nipe, njps, njpe, nkps, nkpe
    INTEGER :: spec_bdy_width
-   INTEGER :: i , j , k , nvchem, nvmoist, nvscalar
+   INTEGER :: i , j , k , nvchem, nvmoist, nvscalar, nvtracer
    INTEGER :: time_loop_max , time_loop
    INTEGER :: total_time_sec , file_counter
    INTEGER :: julyr , julday , iswater , map_proj
@@ -85,9 +85,11 @@ PROGRAM ndown_em
    REAL , DIMENSION(:,:,:) , ALLOCATABLE :: mbdy2dtemp2
    REAL , DIMENSION(:,:,:) , ALLOCATABLE :: cbdy3dtemp1 , cbdy3dtemp2
    REAL , DIMENSION(:,:,:) , ALLOCATABLE :: sbdy3dtemp1 , sbdy3dtemp2
+   REAL , DIMENSION(:,:,:) , ALLOCATABLE :: trbdy3dtemp1 , trbdy3dtemp2
    REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: cbdy3dtemp0
    REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: qbdy3dtemp1_coupled, qbdy3dtemp2_coupled
    REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: sbdy3dtemp1_coupled, sbdy3dtemp2_coupled
+   REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: trbdy3dtemp1_coupled, trbdy3dtemp2_coupled
 
    CHARACTER(LEN=19) :: start_date_char , current_date_char , end_date_char
    CHARACTER(LEN=19) :: stopTimeStr
@@ -561,6 +563,11 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
          ALLOCATE ( sbdy3dtemp2(ims:ime,kms:kme,jms:jme) )
          ALLOCATE ( sbdy3dtemp1_coupled(ims:ime,kms:kme,jms:jme,1:num_scalar) )
          ALLOCATE ( sbdy3dtemp2_coupled(ims:ime,kms:kme,jms:jme,1:num_scalar) )
+         ! wvt: tracer boundary tendency workspace (analogous to moist/scalar)
+         ALLOCATE ( trbdy3dtemp1(ims:ime,kms:kme,jms:jme) )
+         ALLOCATE ( trbdy3dtemp2(ims:ime,kms:kme,jms:jme) )
+         ALLOCATE ( trbdy3dtemp1_coupled(ims:ime,kms:kme,jms:jme,1:num_tracer) )
+         ALLOCATE ( trbdy3dtemp2_coupled(ims:ime,kms:kme,jms:jme,1:num_tracer) )
 
 
       END IF
@@ -835,6 +842,14 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                          ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
            sbdy3dtemp1_coupled(:,:,:,nvscalar) =  sbdy3dtemp1
          END DO
+         ! wvt: couple tracer 4D array at t=0 (analogous to moist/scalar above)
+         DO nvtracer=PARAM_FIRST_SCALAR, num_tracer
+           CALL couple ( nested_grid%mu_2 , nested_grid%mub , trbdy3dtemp1 , nested_grid%tracer(ims:ime,kms:kme,jms:jme,nvtracer)    , &
+                         't' , nested_grid%msfty , &
+                         nested_grid%c1h, nested_grid%c2h, nested_grid%c1f, nested_grid%c2f, &
+                         ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
+           trbdy3dtemp1_coupled(:,:,:,nvtracer) =  trbdy3dtemp1
+         END DO
 
           DO j = jps , jpe
              DO i = ips , ipe
@@ -887,6 +902,18 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                                               nested_grid%scalar_bxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
                                               nested_grid%scalar_bys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
                                               nested_grid%scalar_bye(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
+                                                                     'T' ,                 spec_bdy_width      , &
+                                                                             ids , ide , jds , jde , kds , kde , &
+                                                                             ims , ime , jms , jme , kms , kme , &
+                                                                             ips , ipe , jps , jpe , kps , kpe )
+         END DO
+         ! wvt: stuff initial tracer boundary (t=0) into wrfbdy arrays
+         DO nvtracer=PARAM_FIRST_SCALAR, num_tracer
+           trbdy3dtemp1 = trbdy3dtemp1_coupled(:,:,:,nvtracer)
+           CALL stuff_bdy     ( trbdy3dtemp1 , nested_grid%tracer_bxs(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                                               nested_grid%tracer_bxe(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                                               nested_grid%tracer_bys(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
+                                               nested_grid%tracer_bye(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
                                                                      'T' ,                 spec_bdy_width      , &
                                                                              ids , ide , jds , jde , kds , kde , &
                                                                              ims , ime , jms , jme , kms , kme , &
@@ -955,6 +982,14 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                          ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
            sbdy3dtemp2_coupled(:,:,:,nvscalar) =  sbdy3dtemp2
          END DO
+         ! wvt: couple tracer 4D array at t=delta_t (interior loop)
+         DO nvtracer=PARAM_FIRST_SCALAR, num_tracer
+           CALL couple ( nested_grid%mu_2 , nested_grid%mub , trbdy3dtemp2 , nested_grid%tracer(ims:ime,kms:kme,jms:jme,nvtracer)    , &
+                         't' , nested_grid%msfty , &
+                         nested_grid%c1h, nested_grid%c2h, nested_grid%c1f, nested_grid%c2f, &
+                         ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
+           trbdy3dtemp2_coupled(:,:,:,nvtracer) =  trbdy3dtemp2
+         END DO
 
           DO j = jps , jpe
              DO i = ips , ipe
@@ -1021,6 +1056,21 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                                               nested_grid%scalar_btxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
                                               nested_grid%scalar_btys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
                                               nested_grid%scalar_btye(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
+                                                                 'T' , &
+                                                                                spec_bdy_width,       &
+                                                                  ids , ide , jds , jde , kds , kde , &
+                                                                  ims , ime , jms , jme , kms , kme , &
+                                                                  ips , ipe , jps , jpe , kps , kpe )
+         END DO
+         ! wvt: compute tracer boundary tendencies between t and t+delta_t (interior loop)
+         DO nvtracer=PARAM_FIRST_SCALAR, num_tracer
+           trbdy3dtemp1 = trbdy3dtemp1_coupled(:,:,:,nvtracer)
+           trbdy3dtemp2 = trbdy3dtemp2_coupled(:,:,:,nvtracer)
+           CALL stuff_bdytend ( trbdy3dtemp2 , trbdy3dtemp1 , new_bdy_frq ,  &
+                                              nested_grid%tracer_btxs(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                                              nested_grid%tracer_btxe(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                                              nested_grid%tracer_btys(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
+                                              nested_grid%tracer_btye(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
                                                                  'T' , &
                                                                                 spec_bdy_width,       &
                                                                   ids , ide , jds , jde , kds , kde , &
@@ -1116,6 +1166,8 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
                    pbdy3dtemp1(i,k,j) = pbdy3dtemp2(i,k,j)
                    qbdy3dtemp1_coupled(i,k,j,:) = qbdy3dtemp2_coupled(i,k,j,:)
                    sbdy3dtemp1_coupled(i,k,j,:) = sbdy3dtemp2_coupled(i,k,j,:)
+                   ! wvt: advance tracer coupled state for next iteration
+                   trbdy3dtemp1_coupled(i,k,j,:) = trbdy3dtemp2_coupled(i,k,j,:)
                 END DO
              END DO
           END DO
@@ -1177,6 +1229,19 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
                                 nested_grid%scalar_bxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
                                 nested_grid%scalar_bys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
                                 nested_grid%scalar_bye(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
+                                                      'T' ,                  spec_bdy_width,   &
+                                                                           ids , ide , jds , jde , kds , kde , &
+                                                                           ims , ime , jms , jme , kms , kme , &
+                                                                           ips , ipe , jps , jpe , kps , kpe )
+         END DO
+         ! wvt: re-stuff tracer boundaries from advanced (now t1) coupled state
+         DO nvtracer=PARAM_FIRST_SCALAR, num_tracer
+           trbdy3dtemp1 = trbdy3dtemp1_coupled(:,:,:,nvtracer)
+           CALL stuff_bdy     ( trbdy3dtemp1 , &
+                                nested_grid%tracer_bxs(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                                nested_grid%tracer_bxe(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                                nested_grid%tracer_bys(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
+                                nested_grid%tracer_bye(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
                                                       'T' ,                  spec_bdy_width,   &
                                                                            ids , ide , jds , jde , kds , kde , &
                                                                            ims , ime , jms , jme , kms , kme , &
@@ -1245,6 +1310,14 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
                          nested_grid%c1h, nested_grid%c2h, nested_grid%c1f, nested_grid%c2f, &
                          ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
            sbdy3dtemp2_coupled(:,:,:,nvscalar) = sbdy3dtemp2
+         END DO
+         ! wvt: couple tracer 4D array at final time
+         DO nvtracer=PARAM_FIRST_SCALAR, num_tracer
+           CALL couple ( nested_grid%mu_2 , nested_grid%mub , trbdy3dtemp2 , nested_grid%tracer(ims:ime,kms:kme,jms:jme,nvtracer)    , &
+                         't' , nested_grid%msfty , &
+                         nested_grid%c1h, nested_grid%c2h, nested_grid%c1f, nested_grid%c2f, &
+                         ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
+           trbdy3dtemp2_coupled(:,:,:,nvtracer) = trbdy3dtemp2
          END DO
          mbdy2dtemp2(:,1,:) = nested_grid%mu_2(:,:)
 
@@ -1335,7 +1408,22 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
                                                                   ids , ide , jds , jde , kds , kde , &
                                                                   ims , ime , jms , jme , kms , kme , &
                                                                   ips , ipe , jps , jpe , kps , kpe )
-         END DO  
+         END DO
+         ! wvt: compute tracer boundary tendencies at final time
+         DO nvtracer=PARAM_FIRST_SCALAR, num_tracer
+           trbdy3dtemp1 = trbdy3dtemp1_coupled(:,:,:,nvtracer)
+           trbdy3dtemp2 = trbdy3dtemp2_coupled(:,:,:,nvtracer)
+           CALL stuff_bdytend ( trbdy3dtemp2 , trbdy3dtemp1 , new_bdy_frq ,  &
+                              nested_grid%tracer_btxs(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                              nested_grid%tracer_btxe(jms:jme,kms:kme,1:spec_bdy_width,nvtracer), &
+                              nested_grid%tracer_btys(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
+                              nested_grid%tracer_btye(ims:ime,kms:kme,1:spec_bdy_width,nvtracer), &
+                                                                  'T' , &
+                                                                                spec_bdy_width ,  &
+                                                                  ids , ide , jds , jde , kds , kde , &
+                                                                  ims , ime , jms , jme , kms , kme , &
+                                                                  ips , ipe , jps , jpe , kps , kpe )
+         END DO
 
          CALL stuff_bdytend ( mbdy2dtemp2 , mbdy2dtemp1 , new_bdy_frq , &
                               nested_grid%mu_btxs  , nested_grid%mu_btxe , &
@@ -1934,6 +2022,33 @@ do i = nims , nime
 
     do k = 1,kde_n-1
     parent_grid%moist(i,k,j,itrace) = pro_u_n(k+1)
+    enddo
+
+enddo
+enddo
+ENDIF
+ENDDO
+
+! wvt: vertical remap of parent tracer 4D array onto nest vertical coords
+DO itrace = PARAM_FIRST_SCALAR, num_tracer
+IF ( SIZE( parent_grid%tracer, 1 ) * SIZE( parent_grid%tracer, 3 ) .GT. 1 ) THEN
+do j = njms , njme
+do i = nims , nime
+
+    do k = 1,kde_c-1
+    pro_u_c(k+1) = parent_grid%tracer(i,k,j,itrace)
+    enddo
+    pro_u_c(1      ) = cf1_c*parent_grid%tracer(i,1,j,itrace) &
+                     + cf2_c*parent_grid%tracer(i,2,j,itrace) &
+                     + cf3_c*parent_grid%tracer(i,3,j,itrace)
+
+    pro_u_c(kde_c+1) = cfn_c *parent_grid%tracer(i,kde_c-1,j,itrace) &
+                     + cfn1_c*parent_grid%tracer(i,kde_c-2,j,itrace)
+
+    call inter(pro_u_c,alt_u_c,kde_c+1,pro_u_n,alt_u_n,kde_n+1)
+
+    do k = 1,kde_n-1
+    parent_grid%tracer(i,k,j,itrace) = pro_u_n(k+1)
     enddo
 
 enddo
