@@ -8,30 +8,67 @@ state    real  RTRQCCUTEN        ikj      misc        1         -      r        
 state    real  RTRQSCUTEN        ikj      misc        1         -      r        "RTRQSCUTEN"              "COUPLED TRACER Q_S TENDENCY DUE TO CUMULUS SCHEME"       "Pa kg kg-1 s-1"
 state    real  RTRQICUTEN        ikj      misc        1         -      r        "RTRQICUTEN"              "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME"       "Pa kg kg-1 s-1"
 
-state    real  TRQFX              ij      misc        1         -      rh       "TRQFX"                   "UPWARD MOISTURE TRACER FLUX AT THE SURFACE"          "kg m-2 s-1"
-state    real  TRMASK             ij      misc        1         -      i8r      "TRMASK"                  "2D SOURCE MASK FOR MOISTURE TRACERS "          ""
+! wvt 1d-b: per-region convective tracer tendencies for regions 2..MAX (region 1 = unsuffixed above).
+! Declared identically to region 1 (ikj misc 1 - r) so they inherit identical alloc/default-init/restart/IO.
+! cu_ntiedtke transports qv,qc,qi only. Keep in sync with gen_wvt_cuten.py / MAX_WVT_REGIONS=8.
+state    real  RTRQVCUTEN_02     ikj      misc        1         -      r        "RTRQVCUTEN_02"     "COUPLED TRACER Q_V TENDENCY DUE TO CUMULUS SCHEME, region 02"   "Pa kg kg-1 s-1"
+state    real  RTRQCCUTEN_02     ikj      misc        1         -      r        "RTRQCCUTEN_02"     "COUPLED TRACER Q_C TENDENCY DUE TO CUMULUS SCHEME, region 02"   "Pa kg kg-1 s-1"
+state    real  RTRQICUTEN_02     ikj      misc        1         -      r        "RTRQICUTEN_02"     "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME, region 02"   "Pa kg kg-1 s-1"
+state    real  RTRQVCUTEN_03     ikj      misc        1         -      r        "RTRQVCUTEN_03"     "COUPLED TRACER Q_V TENDENCY DUE TO CUMULUS SCHEME, region 03"   "Pa kg kg-1 s-1"
+state    real  RTRQCCUTEN_03     ikj      misc        1         -      r        "RTRQCCUTEN_03"     "COUPLED TRACER Q_C TENDENCY DUE TO CUMULUS SCHEME, region 03"   "Pa kg kg-1 s-1"
+state    real  RTRQICUTEN_03     ikj      misc        1         -      r        "RTRQICUTEN_03"     "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME, region 03"   "Pa kg kg-1 s-1"
+state    real  RTRQVCUTEN_04     ikj      misc        1         -      r        "RTRQVCUTEN_04"     "COUPLED TRACER Q_V TENDENCY DUE TO CUMULUS SCHEME, region 04"   "Pa kg kg-1 s-1"
+state    real  RTRQCCUTEN_04     ikj      misc        1         -      r        "RTRQCCUTEN_04"     "COUPLED TRACER Q_C TENDENCY DUE TO CUMULUS SCHEME, region 04"   "Pa kg kg-1 s-1"
+state    real  RTRQICUTEN_04     ikj      misc        1         -      r        "RTRQICUTEN_04"     "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME, region 04"   "Pa kg kg-1 s-1"
+state    real  RTRQVCUTEN_05     ikj      misc        1         -      r        "RTRQVCUTEN_05"     "COUPLED TRACER Q_V TENDENCY DUE TO CUMULUS SCHEME, region 05"   "Pa kg kg-1 s-1"
+state    real  RTRQCCUTEN_05     ikj      misc        1         -      r        "RTRQCCUTEN_05"     "COUPLED TRACER Q_C TENDENCY DUE TO CUMULUS SCHEME, region 05"   "Pa kg kg-1 s-1"
+state    real  RTRQICUTEN_05     ikj      misc        1         -      r        "RTRQICUTEN_05"     "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME, region 05"   "Pa kg kg-1 s-1"
+state    real  RTRQVCUTEN_06     ikj      misc        1         -      r        "RTRQVCUTEN_06"     "COUPLED TRACER Q_V TENDENCY DUE TO CUMULUS SCHEME, region 06"   "Pa kg kg-1 s-1"
+state    real  RTRQCCUTEN_06     ikj      misc        1         -      r        "RTRQCCUTEN_06"     "COUPLED TRACER Q_C TENDENCY DUE TO CUMULUS SCHEME, region 06"   "Pa kg kg-1 s-1"
+state    real  RTRQICUTEN_06     ikj      misc        1         -      r        "RTRQICUTEN_06"     "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME, region 06"   "Pa kg kg-1 s-1"
+state    real  RTRQVCUTEN_07     ikj      misc        1         -      r        "RTRQVCUTEN_07"     "COUPLED TRACER Q_V TENDENCY DUE TO CUMULUS SCHEME, region 07"   "Pa kg kg-1 s-1"
+state    real  RTRQCCUTEN_07     ikj      misc        1         -      r        "RTRQCCUTEN_07"     "COUPLED TRACER Q_C TENDENCY DUE TO CUMULUS SCHEME, region 07"   "Pa kg kg-1 s-1"
+state    real  RTRQICUTEN_07     ikj      misc        1         -      r        "RTRQICUTEN_07"     "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME, region 07"   "Pa kg kg-1 s-1"
+state    real  RTRQVCUTEN_08     ikj      misc        1         -      r        "RTRQVCUTEN_08"     "COUPLED TRACER Q_V TENDENCY DUE TO CUMULUS SCHEME, region 08"   "Pa kg kg-1 s-1"
+state    real  RTRQCCUTEN_08     ikj      misc        1         -      r        "RTRQCCUTEN_08"     "COUPLED TRACER Q_C TENDENCY DUE TO CUMULUS SCHEME, region 08"   "Pa kg kg-1 s-1"
+state    real  RTRQICUTEN_08     ikj      misc        1         -      r        "RTRQICUTEN_08"     "COUPLED TRACER Q_I TENDENCY DUE TO CUMULUS SCHEME, region 08"   "Pa kg kg-1 s-1"
+
+state    real  TRQFX              i{wvtreg}j  misc    1         -      rh       "TRQFX"                   "UPWARD MOISTURE TRACER FLUX AT THE SURFACE, per WVT region"  "kg m-2 s-1"
+state    real  TRMASK             i{wvtreg}j  misc    1         -      i8r      "TRMASK"                  "2D SOURCE MASK FOR MOISTURE TRACERS, per WVT region"          ""
 state    real  TRMASK3D          ikj      misc        1         -      i8r      "TRMASK3D"                "3D SOURCE MASK FOR MOISTURE TRACERS "          ""
 state    real  TRMASK3D2         ikj      misc        1         -      i8r      "TRMASK3D2"               "3D SINK MASK FOR MOISTURE TRACERS   "          ""
 
-state    real  TR_RAINNC          ij      misc        1         -      rhdu     "TR_RAINNC"               "ACCUMULATED TOTAL GRID SCALE PRECIPITATION FROM MOISTURE TRACERS"         "mm"
-state    real  TR_SNOWNC          ij      misc        1         -      rhdu     "TR_SNOWNC"               "ACCUMULATED TOTAL GRID SCALE SNOW AND ICE FROM MOISTURE TRACERS"          "mm"
-state    real  TR_GRAUPELNC       ij      misc        1         -      rhdu     "TR_GRAUPELNC"            "ACCUMULATED TOTAL GRID SCALE GRAUPEL FROM MOISTURE TRACERS"               "mm"
+state    real  TR_RAINNC          i{wvtreg}j  misc    1         -      rhdu     "TR_RAINNC"               "ACCUMULATED TOTAL GRID SCALE PRECIPITATION FROM MOISTURE TRACERS, per WVT region"         "mm"
+state    real  TR_SNOWNC          i{wvtreg}j  misc    1         -      rhdu     "TR_SNOWNC"               "ACCUMULATED TOTAL GRID SCALE SNOW AND ICE FROM MOISTURE TRACERS, per WVT region"          "mm"
+state    real  TR_GRAUPELNC       i{wvtreg}j  misc    1         -      rhdu     "TR_GRAUPELNC"            "ACCUMULATED TOTAL GRID SCALE GRAUPEL FROM MOISTURE TRACERS, per WVT region"               "mm"
 
-state    real  TR_RAINC           ij      misc        1         -      rhdu     "TR_RAINC"                "ACCUMULATED TOTAL CUMULUS PRECIPITATION FROM MOISTURE TRACERS"         "mm"
-state    real  TR_PRATEC          ij      misc        1         -      r        "TR_PRATEC"               "TRACER PRECIP RATE FROM CUMULUS SCHEME"                         "mm s-1"
+state    real  TR_RAINC           i{wvtreg}j  misc    1         -      rhdu     "TR_RAINC"                "ACCUMULATED TOTAL CUMULUS PRECIPITATION FROM MOISTURE TRACERS, per WVT region"         "mm"
+state    real  TR_PRATEC          i{wvtreg}j  misc    1         -      r        "TR_PRATEC"               "TRACER PRECIP RATE FROM CUMULUS SCHEME, per WVT region"                         "mm s-1"
 
-state    integer  I_TR_RAINNC    ij      misc        1         -      rhd=(interp_fcni)u=(copy_fcni)     "I_TR_RAINNC"     "BUCKET FOR TR_RAINNC"     ""
-state    integer  I_TR_RAINC     ij      misc        1         -      rhd=(interp_fcni)u=(copy_fcni)     "I_TR_RAINC"      "BUCKET FOR TR_RAINC"      ""
+state    integer  I_TR_RAINNC    i{wvtreg}j  misc    1         -      rhd=(interp_fcni)u=(copy_fcni)     "I_TR_RAINNC"     "BUCKET FOR TR_RAINNC, per WVT region"     ""
+state    integer  I_TR_RAINC     i{wvtreg}j  misc    1         -      rhd=(interp_fcni)u=(copy_fcni)     "I_TR_RAINC"      "BUCKET FOR TR_RAINC, per WVT region"      ""
 
 state   real  tr_thum_u_phy_dt   ikj      misc        1         -      rh       "tr_thum_u_phy_dt"        "tracer total humidity * x-wind component * dt"      "kg kg-1 m"
 state   real  tr_thum_v_phy_dt   ikj      misc        1         -      rh       "tr_thum_v_phy_dt"        "tracer total humidity * y-wind component * dt"      "kg kg-1 m"
+! wvt: per-region total-humidity moisture fluxes for regions 2..MAX (region 1 = unsuffixed above).
+! Identical declaration to region 1 (ikj misc 1 - rh). Keep in sync with gen_wvt_thum.py / MAX_WVT_REGIONS=8.
+state   real  tr_thum_u_phy_dt_02  ikj      misc        1         -      rh       "tr_thum_u_phy_dt_02"   "tracer total humidity * x-wind component * dt, region 02"   "kg kg-1 m"
+state   real  tr_thum_v_phy_dt_02  ikj      misc        1         -      rh       "tr_thum_v_phy_dt_02"   "tracer total humidity * y-wind component * dt, region 02"   "kg kg-1 m"
+state   real  tr_thum_u_phy_dt_03  ikj      misc        1         -      rh       "tr_thum_u_phy_dt_03"   "tracer total humidity * x-wind component * dt, region 03"   "kg kg-1 m"
+state   real  tr_thum_v_phy_dt_03  ikj      misc        1         -      rh       "tr_thum_v_phy_dt_03"   "tracer total humidity * y-wind component * dt, region 03"   "kg kg-1 m"
+state   real  tr_thum_u_phy_dt_04  ikj      misc        1         -      rh       "tr_thum_u_phy_dt_04"   "tracer total humidity * x-wind component * dt, region 04"   "kg kg-1 m"
+state   real  tr_thum_v_phy_dt_04  ikj      misc        1         -      rh       "tr_thum_v_phy_dt_04"   "tracer total humidity * y-wind component * dt, region 04"   "kg kg-1 m"
+state   real  tr_thum_u_phy_dt_05  ikj      misc        1         -      rh       "tr_thum_u_phy_dt_05"   "tracer total humidity * x-wind component * dt, region 05"   "kg kg-1 m"
+state   real  tr_thum_v_phy_dt_05  ikj      misc        1         -      rh       "tr_thum_v_phy_dt_05"   "tracer total humidity * y-wind component * dt, region 05"   "kg kg-1 m"
+state   real  tr_thum_u_phy_dt_06  ikj      misc        1         -      rh       "tr_thum_u_phy_dt_06"   "tracer total humidity * x-wind component * dt, region 06"   "kg kg-1 m"
+state   real  tr_thum_v_phy_dt_06  ikj      misc        1         -      rh       "tr_thum_v_phy_dt_06"   "tracer total humidity * y-wind component * dt, region 06"   "kg kg-1 m"
+state   real  tr_thum_u_phy_dt_07  ikj      misc        1         -      rh       "tr_thum_u_phy_dt_07"   "tracer total humidity * x-wind component * dt, region 07"   "kg kg-1 m"
+state   real  tr_thum_v_phy_dt_07  ikj      misc        1         -      rh       "tr_thum_v_phy_dt_07"   "tracer total humidity * y-wind component * dt, region 07"   "kg kg-1 m"
+state   real  tr_thum_u_phy_dt_08  ikj      misc        1         -      rh       "tr_thum_u_phy_dt_08"   "tracer total humidity * x-wind component * dt, region 08"   "kg kg-1 m"
+state   real  tr_thum_v_phy_dt_08  ikj      misc        1         -      rh       "tr_thum_v_phy_dt_08"   "tracer total humidity * y-wind component * dt, region 08"   "kg kg-1 m"
 
 
 rconfig   integer tracer3dsource        namelist,dynamics      max_domains    0        rh    "tracer3dsource"    "switch to activate 3D region (read in from file) as tracer moisture source " ""
 rconfig   integer tracer2dsource        namelist,dynamics      max_domains    0        rh    "tracer2dsource"    "switch to activate 2D region (read in from file) as tracer moisture source " ""
 rconfig   integer tracer3dsink          namelist,dynamics      max_domains    0        rh    "tracer3dsink"      "switch to activate 3D region (read in from file) as tracer moisture sink " ""
-
-# Accepted-but-unused in the single-region build. The shared multi-region orchestration always injects
-# num_wvt_regions into &dynamics (set_params.py); declaring it here (scalar, default 1) lets the single-region
-# WRF read that namelist without a fatal "&dynamics" error. No single-region code references it.
-rconfig   integer num_wvt_regions       namelist,dynamics      1              1        rh    "num_wvt_regions"   "number of WVT tagged source regions (single-region build: always 1; accepted for namelist compatibility)" ""
+rconfig   integer num_wvt_regions       namelist,dynamics      1              1        rh    "num_wvt_regions"   "number of simultaneous WVT tagged moisture source regions (1..MAX_WVT_REGIONS=8); scalar (sizes the wvtreg dimension)" ""
