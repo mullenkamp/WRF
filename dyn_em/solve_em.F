@@ -3616,6 +3616,90 @@ BENCH_END(advance_ppt_tim)
    ENDDO
   !$OMP END PARALLEL DO
 
+! wvt 1d-b: decouple convective tracer tendencies for regions 2..N (mirrors phy_prep_part2 region 1,
+! which divides grid%rtrqvcuten by (c1h*muts+c2h) over mass points). Restores the uncoupled mixing-ratio
+! tendency so it persists between cumulus steps. Patch loop == union of region-1 tiles; muts/c1h/c2h as in
+! the phy_prep_part2 call above.
+   IF (P_QV_TR .ge. PARAM_FIRST_SCALAR) THEN
+      IF (config_flags%num_wvt_regions >= 2) THEN
+         DO j = jps, MIN(jpe,jde-1)
+         DO k = kps, MIN(kpe,kde-1)
+         DO i = ips, MIN(ipe,ide-1)
+            grid%rtrqvcuten_02(i,k,j) = grid%rtrqvcuten_02(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqccuten_02(i,k,j) = grid%rtrqccuten_02(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqicuten_02(i,k,j) = grid%rtrqicuten_02(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+      IF (config_flags%num_wvt_regions >= 3) THEN
+         DO j = jps, MIN(jpe,jde-1)
+         DO k = kps, MIN(kpe,kde-1)
+         DO i = ips, MIN(ipe,ide-1)
+            grid%rtrqvcuten_03(i,k,j) = grid%rtrqvcuten_03(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqccuten_03(i,k,j) = grid%rtrqccuten_03(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqicuten_03(i,k,j) = grid%rtrqicuten_03(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+      IF (config_flags%num_wvt_regions >= 4) THEN
+         DO j = jps, MIN(jpe,jde-1)
+         DO k = kps, MIN(kpe,kde-1)
+         DO i = ips, MIN(ipe,ide-1)
+            grid%rtrqvcuten_04(i,k,j) = grid%rtrqvcuten_04(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqccuten_04(i,k,j) = grid%rtrqccuten_04(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqicuten_04(i,k,j) = grid%rtrqicuten_04(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+      IF (config_flags%num_wvt_regions >= 5) THEN
+         DO j = jps, MIN(jpe,jde-1)
+         DO k = kps, MIN(kpe,kde-1)
+         DO i = ips, MIN(ipe,ide-1)
+            grid%rtrqvcuten_05(i,k,j) = grid%rtrqvcuten_05(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqccuten_05(i,k,j) = grid%rtrqccuten_05(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqicuten_05(i,k,j) = grid%rtrqicuten_05(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+      IF (config_flags%num_wvt_regions >= 6) THEN
+         DO j = jps, MIN(jpe,jde-1)
+         DO k = kps, MIN(kpe,kde-1)
+         DO i = ips, MIN(ipe,ide-1)
+            grid%rtrqvcuten_06(i,k,j) = grid%rtrqvcuten_06(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqccuten_06(i,k,j) = grid%rtrqccuten_06(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqicuten_06(i,k,j) = grid%rtrqicuten_06(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+      IF (config_flags%num_wvt_regions >= 7) THEN
+         DO j = jps, MIN(jpe,jde-1)
+         DO k = kps, MIN(kpe,kde-1)
+         DO i = ips, MIN(ipe,ide-1)
+            grid%rtrqvcuten_07(i,k,j) = grid%rtrqvcuten_07(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqccuten_07(i,k,j) = grid%rtrqccuten_07(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqicuten_07(i,k,j) = grid%rtrqicuten_07(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+      IF (config_flags%num_wvt_regions >= 8) THEN
+         DO j = jps, MIN(jpe,jde-1)
+         DO k = kps, MIN(kpe,kde-1)
+         DO i = ips, MIN(ipe,ide-1)
+            grid%rtrqvcuten_08(i,k,j) = grid%rtrqvcuten_08(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqccuten_08(i,k,j) = grid%rtrqccuten_08(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+            grid%rtrqicuten_08(i,k,j) = grid%rtrqicuten_08(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))
+         ENDDO
+         ENDDO
+         ENDDO
+      ENDIF
+   ENDIF
+
 !<DESCRIPTION>
 !<pre>
 ! (5) time-split physics.
@@ -3842,12 +3926,8 @@ BENCH_START(micro_driver_tim)
       &        , QIP_CURR=moist(ims,kms,jms,P_QIP), F_QIP=F_QIP               &
       &        , QID_CURR=moist(ims,kms,jms,P_QID), F_QID=F_QID               &
       &        , QNDROP_CURR=scalar(ims,kms,jms,P_QNDROP), F_QNDROP=F_QNDROP &
-      &        , TR_QV_CURR=tracer(ims,kms,jms,P_QV_TR), F_TR_QV=F_QV_TR         &  ! wvt: moisture tracers
-      &        , TR_QC_CURR=tracer(ims,kms,jms,P_QC_TR), F_TR_QC=F_QC_TR     &
-      &        , TR_QR_CURR=tracer(ims,kms,jms,P_QR_TR), F_TR_QR=F_QR_TR     &
-      &        , TR_QI_CURR=tracer(ims,kms,jms,P_QI_TR), F_TR_QI=F_QI_TR     &
-      &        , TR_QS_CURR=tracer(ims,kms,jms,P_QS_TR), F_TR_QS=F_QS_TR     &
-      &        , TR_QG_CURR=tracer(ims,kms,jms,P_QG_TR), F_TR_QG=F_QG_TR     &
+      &        , tr_block=tracer(ims,kms,jms,P_QV_TR), F_TR_QV=F_QV_TR    &  ! wvt: contiguous moisture-tracer block (base=P_QV_TR)
+      &        , num_wvt_regions=config_flags%num_wvt_regions             &  ! wvt
       &        , TR_RAINNC=grid%tr_rainnc, TR_SNOWNC=grid%tr_snownc       &
       &        , TR_GRAUPELNC=grid%tr_graupelnc                           &
 #if (WRF_CHEM == 1)
