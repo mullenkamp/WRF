@@ -1,91 +1,125 @@
 # WVT Upstream Contribution Guide
 
-## Current State
+## What this repo is
 
-This repo (`WRF-WVT`) is a local reference of WVT changes against WRF 4.7.1. It has 11 clean commits on the `feature/water-vapor-tracers` branch, each targeting a specific scheme or component. It is NOT a GitHub fork -- it's a local clone at the v4.7.1 tag with our changes on top.
+A clone of `wrf-model/WRF` at tag `v4.7.1` with the Water Vapour Tracer (WVT) modifications
+applied as a series of commits on `feature/water-vapor-tracers`. It is the integrated source
+tree — the form the work would take if offered upstream. It is not the form it is developed or
+deployed in.
 
-The working development copy lives in the Docker overlay at:
-```
-/home/mike/git/wrf-repos/wrf-docker-builds/debian/wvt/
-```
+For the current commit series and its area partitioning:
 
-## Two Concerns
-
-### 1. Ongoing Development (Fixes, Features, New Schemes)
-
-**Workflow:**
-1. Make changes to the overlay files in `debian/wvt/`
-2. Rebuild Docker images and test
-3. Periodically sync changes to this repo:
-   ```bash
-   cd /home/mike/git/wrf-repos/WRF-WVT
-   # Copy updated overlay files
-   cp /path/to/debian/wvt/phys/module_cu_kfeta.F phys/
-   # Commit with descriptive message
-   git add phys/module_cu_kfeta.F
-   git commit -m "KF: Fix division by zero in tracer downdraft evaporation"
-   ```
-4. For bug fixes in existing schemes, add new commits on top (don't amend -- preserves history)
-5. For new schemes, add new commits following the existing pattern
-
-### 2. Eventual Upstream Contribution
-
-**Prerequisites before starting:**
-1. Open a GitHub issue on `wrf-model/WRF` describing WVT and expressing interest in contributing
-2. Get maintainer feedback -- they may have preferences for implementation approach, code style, testing
-3. Check if anyone else is working on similar tracer functionality
-4. Review WRF's contribution guidelines (CLA, code style, testing requirements)
-5. Determine which version to target (likely the latest development branch, not a release)
-
-**Workflow when ready:**
-1. Fork `wrf-model/WRF` on GitHub (creates `your-username/WRF`)
-2. Clone your fork locally
-3. Create a feature branch from their **development branch** (NOT from a release tag):
-   ```bash
-   git clone https://github.com/your-username/WRF.git WRF-upstream
-   cd WRF-upstream
-   git checkout -b feature/water-vapor-tracers origin/develop  # or main
-   ```
-4. Use the commits in this repo as a guide to apply changes to the new version:
-   - Port one commit at a time (Registry, WSM6, YSU, KF, etc.)
-   - Resolve any conflicts from WRF version changes
-   - Test each scheme after porting
-5. Push to your fork:
-   ```bash
-   git push origin feature/water-vapor-tracers
-   ```
-6. Open a PR against `wrf-model/WRF`'s development branch
-
-**Important:** The PR targets the DEVELOPMENT branch, not a release. Maintainers don't accept changes to released versions.
-
-## Commit Structure Reference
-
-Each commit in this repo targets a specific area, making porting manageable:
-
-```
-d711bd3 Registry: Add WVT moisture tracer state variables, tendencies, masks, and namelist options
-8dbc18d WSM6: Add moisture tracer mass-fraction tracking
-c266531 YSU: Add tracer vertical mixing via qmix infrastructure with surface flux
-03327b6 Kain-Fritsch: Add moisture tracer transport through convective mass flux
-4bde403 New Tiedtke: Add tracer flux-divergence transport with cloud detrainment
-495ee6b Multi-scale KF: Add moisture tracer transport (KF pattern with scale-awareness)
-92a460e SMS-3DTKE: Add tracer surface flux injection to implicit and explicit solvers
-5c313b6 Drivers: Thread tracer arguments through physics drivers and tendency accumulation
-7d0b196 Dynamics: Add tracer source/sink, flux diagnostics, auxinput8 I/O, and diffusion threading
-890ed8e Validation: Add namelist consistency checks for WVT scheme combinations
-75c02cd Docs: Add WVT tracer README and example namelist
+```bash
+git log --oneline v4.7.1..HEAD
 ```
 
-When porting to a new WRF version, work through these in order. The Registry and Dynamics commits are most likely to have conflicts (WRF restructures these across versions). The physics scheme commits (WSM6, YSU, KF, etc.) are more self-contained.
+Tags:
 
-## Related Documentation
+- `wvt-4.7.1-single-region` — the single-region scheme exactly as compiled by the single-region
+  production images.
 
-- `wrf-docker-builds/debian/wrf-wps-intel-wvt/wvt-porting-notes.md` -- Detailed porting notes and validation results
-- `wrf-docker-builds/debian/wrf-wps-intel-wvt/wvt-integration-guide.md` -- How to add WVT to new physics schemes
-- `wrf-docker-builds/debian/wrf-wps-intel-wvt/sms-3dtke-wvt-status.md` -- SMS-3DTKE implementation details
+## Where development actually happens
 
-## Reference
+Development happens in the **Docker source overlays** in the `wrf-docker-builds` repository, not
+here. An overlay is a partial mirror of the WRF tree; the Dockerfile untars a stock WRF release
+and copies the overlay over it.
 
-Insua-Costa, D. and Miguez-Macho, G. (2018), "A new moisture tagging capability in the Weather Research and Forecasting model: formulation, validation and application to the 2014 Great Lake-effect snowstorm", Earth Syst. Dynam., 9, 167-185.
+| Overlay | Status | Built by |
+|---|---|---|
+| `debian/wvt-multi/` | live — the current production source | the multi-region images |
+| `debian/wvt-single/` | frozen — kept as an independent reference | the single-region images |
+| `debian/wvt-ref/` | provenance — the original authors' WRF 4.3.3 modules, unmodified | the reference image |
 
-Original repository: https://github.com/damianinsua/WRF-WVTs
+**This repo is synced *from* the overlay, never the other way round.** The two are meant to be
+byte-identical on every file the overlay contains; `debian/check_fork_sync.sh` in
+`wrf-docker-builds` is what says whether they still are. Run it before trusting this tree.
+
+## Syncing overlay changes into this repo
+
+1. Make and validate the change in `debian/wvt-multi/`.
+2. Copy the changed files here at the same relative path (the exceptions are the overlay's
+   `test/` → `test/wvt/` here, and `MULTI_REGION_WIP.md` → the repo root).
+3. Commit **by area**, following the existing convention: `Registry:`, `WSM6:`, `New Tiedtke:`,
+   `Drivers:`, `Dynamics:`, `Diagnostics:`, `Validation:`, `Docs:`, `Tests:`. Never amend —
+   fixes go on top.
+4. Run `check_fork_sync.sh` and confirm it is clean.
+
+**On the area partition.** The commits are *porting units*, not bisection points: the split
+exists so each area can be re-applied and conflict-resolved independently against a future WRF
+release. Several commits therefore do not compile alone. When a change has a partner in another
+area — a routine's signature and its call site, a field's declaration and its use — **say so in
+both commit messages**. Registry and Dynamics are the areas most likely to conflict when WRF
+restructures.
+
+## Scope limits of the multi-region path
+
+Enforced in `share/module_check_a_mundo.F`, which is the authoritative statement:
+
+- `num_wvt_regions` is 1..8. Raising the cap means regenerating the Registry with the
+  `Registry/gen_wvt_*.py` generators, raising `MAX_WVT_REGIONS`, and rebuilding.
+- `num_wvt_regions > 1` requires `tracer_opt = 4`, `bl_pbl_physics = 0`, and
+  `tracer3dsource = tracer3dsink = 0`.
+- YSU multi-region mixing and 3D source/sink are deliberately not wired. Multi-region cumulus
+  transport is implemented for New Tiedtke only.
+- `num_wvt_regions = 1` reproduces the single-region scheme bit-for-bit.
+
+## Before attempting an upstream contribution
+
+1. Open an issue on `wrf-model/WRF` describing WVT and the intent to contribute; get maintainer
+   feedback on approach, style and testing before writing anything.
+2. **Get permission from the owners of each modified scheme.** WSM6, YSU, KF, Tiedtke, MSKF and
+   SMS-3DTKE have owners, and changes to them are not the contributor's to make unilaterally.
+   Expect possible WRF Physics Review Panel (`wprp@ucar.edu`) involvement.
+3. Target the **development** branch, never a release tag.
+4. Re-check upstream's contribution policy at the time — including whether one now exists on
+   AI-assisted contributions. As of 2026-07-18 there was none, and no CLA or DCO. Disclose the
+   AI assistance in the PR description regardless.
+5. Attribute the original scheme (see References).
+
+### The `phys/physics_mmm/` problem — read this before planning a PR
+
+Three of the most heavily modified files in this tree are **not part of the `wrf-model/WRF`
+repository**:
+
+```
+phys/physics_mmm/mp_wsm6.F90
+phys/physics_mmm/bl_ysu.F90
+phys/physics_mmm/cu_ntiedtke.F90
+```
+
+`phys/physics_mmm` is not a submodule and has no files at the `v4.7.1` tag; it is pulled in by
+`tools/manage_externals` from NCAR's MMM-physics repository. WRF 4.7.1 routes WSM6, YSU and New
+Tiedtke through it, so the WVT changes to those schemes live there and **cannot be delivered by a
+PR against `wrf-model/WRF` alone.** A contribution needs a coordinated change to the external
+plus the WRF-side Registry, driver and dynamics changes.
+
+Two practical consequences:
+
+- **Running the externals checkout in this working tree will overwrite those three files.** This
+  tree carries only the 3 WVT-modified files, not the external's full set, so it is also not
+  self-sufficient for a build. Build from the Docker overlay instead.
+- The `wrf-4.7.1-base` branch exists because those files are generated/external: it holds them at
+  their stock 4.7.1 content so the WVT delta against them is isolable. `git diff wrf-4.7.1-base`
+  on that directory is the real change.
+
+## Related documentation
+
+In `wrf-docker-builds/debian/wrf-wps-intel-wvt/`:
+
+- `wvt-porting-notes.md` — the WRF 4.3.3 → 4.7.1 port, per-file, with validation results.
+- `wvt-integration-guide.md` — how WVT works and how to add it to a new physics scheme.
+- `wvt-source-edge-ringing.md` — numerical analysis of the hard-edged source mask.
+
+In this repo:
+
+- `MULTI_REGION_WIP.md` — the multi-region design record: invariants, stage history, validation.
+- `run/README.tracers` — the minimal namelist recipe.
+- `test/wvt/` — validation scripts for the multi-region scheme.
+
+## References
+
+Insua-Costa, D. and Miguez-Macho, G. (2018), "A new moisture tagging capability in the Weather
+Research and Forecasting model: formulation, validation and application to the 2014 Great
+Lake-effect snowstorm", Earth Syst. Dynam., 9, 167–185.
+
+Original implementation: https://github.com/damianinsua/WRF-WVTs
