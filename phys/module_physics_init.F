@@ -459,9 +459,8 @@ CONTAINS
    REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(OUT) ::           &
              RAINNC, RAINC, RAINCV, RAINNCV,  &
              SNOWNC, SNOWNCV, GRAUPELNC, GRAUPELNCV
-! wvt: tracer
-   REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(OUT) ::           &
-             TR_RAINNC, TR_RAINC, TR_SNOWNC, TR_GRAUPELNC
+! wvt: tracer (per-region i,n,j)
+   REAL,     DIMENSION( ims: , : , jms: ) , INTENT(OUT) :: TR_RAINNC, TR_SNOWNC, TR_GRAUPELNC, TR_RAINC ! wvt
 
    REAL,     DIMENSION(ims:ime,kms:kme,jms:jme), INTENT(IN) :: z_at_q            !  G. Thompson
    REAL,     DIMENSION(ims:ime,kms:kme,jms:jme), INTENT(IN) :: inv_dens          !  G. Thompson
@@ -4039,7 +4038,7 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
 
    REAL ,   DIMENSION( ims:ime , jms:jme ), INTENT(OUT):: RAINC, RAINCV
 
-   REAL ,   DIMENSION( ims:ime , jms:jme ), INTENT(OUT):: TR_RAINC   ! wvt: tracer
+   REAL ,   DIMENSION( ims: , : , jms: ), INTENT(OUT):: TR_RAINC   ! wvt: per-region (i,n,j)
 
    REAL ,   DIMENSION( ims:ime , jms:jme ), INTENT(OUT):: CLDEFI
 #if ( EM_CORE == 1 )
@@ -4078,9 +4077,9 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
      DO i=its,itf
         RAINC(i,j)=0.
         RAINCV(i,j)=0.
-        TR_RAINC(i,j)=0.! wvt
      ENDDO
      ENDDO
+     TR_RAINC = 0.   ! wvt: zero all regions at init
    ENDIF
 
 !-- deep convection and hybrid deep-shallow convection schemes
@@ -4484,7 +4483,8 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
                                   its, ite, jts, jte, kts, kte
 
    INTEGER , DIMENSION( ims:ime , jms:jme ) ,INTENT(INOUT)  :: LOWLYR
-   REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(INOUT) :: RAINNC,TR_RAINNC,SNOWNC,TR_SNOWNC,GRAUPELNC,TR_GRAUPELNC ! wvt
+   REAL,     DIMENSION( ims:ime , jms:jme ) , INTENT(INOUT) :: RAINNC,SNOWNC,GRAUPELNC ! wvt
+   REAL,     DIMENSION( ims: , : , jms: ) , INTENT(INOUT) :: TR_RAINNC,TR_SNOWNC,TR_GRAUPELNC ! wvt: per-region (i,n,j)
    REAL,     DIMENSION( ims:ime , kms:kme, jms:jme ) , INTENT(INOUT) :: &
                                   F_ICE_PHY,F_RAIN_PHY,F_RIMEF_PHY
 #if ( EM_CORE == 1 )
@@ -4525,11 +4525,11 @@ CALL lsm_mosaic_init(IVGTYP,config_flags%ISWATER,config_flags%ISURBAN,config_fla
         RAINNC(i,j) = 0.
         SNOWNC(i,j) = 0.
         GRAUPELNC(i,j) = 0.
-        TR_RAINNC(i,j) = 0.   ! wvt
-        TR_SNOWNC(i,j) = 0.   ! wvt
-        TR_GRAUPELNC(i,j) = 0. ! wvt
      ENDDO
      ENDDO
+     TR_RAINNC = 0.    ! wvt: zero all regions at init
+     TR_SNOWNC = 0.    ! wvt
+     TR_GRAUPELNC = 0. ! wvt
    ENDIF
 
    mp_select: SELECT CASE(config_flags%mp_physics)
