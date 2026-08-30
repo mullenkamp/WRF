@@ -2,8 +2,8 @@
 
 ## What this repo is
 
-A clone of `wrf-model/WRF` at tag `v4.7.1` with the Water Vapour Tracer (WVT) modifications
-applied as a series of commits on `feature/water-vapor-tracers`. It is the integrated source
+A fork of `wrf-model/WRF` (`github.com/mullenkamp/WRF`) at tag `v4.7.1`, with the Water Vapour
+Tracer (WVT) modifications applied as a series of commits on `feature/water-vapor-tracers`. It is the integrated source
 tree — the form the work would take if offered upstream. It is not the form it is developed or
 deployed in.
 
