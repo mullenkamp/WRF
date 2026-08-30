@@ -41,7 +41,8 @@ byte-identical on every file the overlay contains; `debian/check_fork_sync.sh` i
    `test/` → `test/wvt/` here, and `MULTI_REGION_WIP.md` → the repo root).
 3. Commit **by area**, following the existing convention: `Registry:`, `WSM6:`, `New Tiedtke:`,
    `Drivers:`, `Dynamics:`, `Diagnostics:`, `Validation:`, `Docs:`, `Tests:`. Never amend —
-   fixes go on top.
+   fixes go on top. This branch is **published**, so rewriting it would break anyone who has
+   fetched it; that includes tidying a bad comment or a stray path, which must now be a new commit.
 4. Run `check_fork_sync.sh` and confirm it is clean.
 
 **On the area partition.** The commits are *porting units*, not bisection points: the split
@@ -71,10 +72,21 @@ Enforced in `share/module_check_a_mundo.F`, which is the authoritative statement
    SMS-3DTKE have owners, and changes to them are not the contributor's to make unilaterally.
    Expect possible WRF Physics Review Panel (`wprp@ucar.edu`) involvement.
 3. Target the **development** branch, never a release tag.
-4. Re-check upstream's contribution policy at the time — including whether one now exists on
+4. **Expect to rebase, and make sure you can.** This branch is built on `v4.7.1` and upstream moves
+   continuously, so by the time a PR is opened the base will have shifted — port the commits area by
+   area onto the current development branch rather than trying to merge. Two things to check before
+   starting: that `upstream` points at `wrf-model/WRF` (`origin` should be your own fork), and that
+   the clone has **full history** — a shallow clone cannot rebase onto a new release:
+
+   ```bash
+   git rev-parse --is-shallow-repository     # must be false
+   git fetch --unshallow upstream            # if it is not
+   ```
+
+5. Re-check upstream's contribution policy at the time — including whether one now exists on
    AI-assisted contributions. As of 2026-07-18 there was none, and no CLA or DCO. Disclose the
    AI assistance in the PR description regardless.
-5. Attribute the original scheme (see References).
+6. Attribute the original scheme (see References).
 
 ### The `phys/physics_mmm/` problem — read this before planning a PR
 
