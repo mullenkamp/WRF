@@ -108,11 +108,22 @@ That branch is cut **from the pinned tag**, so the physics baseline is byte-iden
 **This repo tracks no files under `phys/physics_mmm/`**, exactly as upstream does. To build:
 
 ```bash
-git clone -b feature/water-vapor-tracers https://github.com/mullenkamp/WRF.git
+git clone --recurse-submodules -b feature/water-vapor-tracers \
+    https://github.com/mullenkamp/WRF.git
 cd WRF
-./tools/manage_externals/checkout_externals -e arch/Externals.cfg   # note: -e, it is not at the root
+./tools/manage_externals/checkout_externals -e arch/Externals.cfg
 ./configure && ./compile em_real
 ```
+
+Two things bite here, neither of them WVT-specific:
+
+- **`-e arch/Externals.cfg` is required.** `checkout_externals` defaults to `Externals.cfg` at the
+  repo root; WRF keeps it under `arch/`. Without the flag it exits with
+  `"Did you run from the root of the source tree?"`, which points at the wrong problem.
+- **`--recurse-submodules` is required.** `phys/noahmp`, `phys/MYNN-EDMF` and `.ci/hpc-workflows`
+  are git submodules, separate from the `manage_externals` mechanism, and a plain clone leaves them
+  empty — `phys/Makefile` needs `noahmp`. If you already cloned without it:
+  `git submodule update --init --recursive`.
 
 **Consequences for an upstream PR.** The WVT work is in two halves and both are required: the
 Registry, driver and dynamics changes here, and the three physics schemes in the external. A PR
