@@ -88,31 +88,42 @@ Enforced in `share/module_check_a_mundo.F`, which is the authoritative statement
    AI assistance in the PR description regardless.
 6. Attribute the original scheme (see References).
 
-### The `phys/physics_mmm/` problem — read this before planning a PR
+### `phys/physics_mmm/` is an external — and the WVT changes live in a fork of it
 
-Three of the most heavily modified files in this tree are **not part of the `wrf-model/WRF`
-repository**:
+WRF routes WSM6, YSU and New Tiedtke through `phys/physics_mmm/`, which is **not part of the
+`wrf-model/WRF` repository**. It is pulled by `tools/manage_externals` from what
+`arch/Externals.cfg` points at. Upstream that is `NCAR/MMM-physics` @ tag `20240626-MPASv8.2`;
+here it is:
 
 ```
-phys/physics_mmm/mp_wsm6.F90
-phys/physics_mmm/bl_ysu.F90
-phys/physics_mmm/cu_ntiedtke.F90
+repo_url = https://github.com/mullenkamp/MMM-physics.git
+branch   = feature/water-vapor-tracers
 ```
 
-`phys/physics_mmm` is not a submodule and has no files at the `v4.7.1` tag; it is pulled in by
-`tools/manage_externals` from NCAR's MMM-physics repository. WRF 4.7.1 routes WSM6, YSU and New
-Tiedtke through it, so the WVT changes to those schemes live there and **cannot be delivered by a
-PR against `wrf-model/WRF` alone.** A contribution needs a coordinated change to the external
-plus the WRF-side Registry, driver and dynamics changes.
+That branch is cut **from the pinned tag**, so the physics baseline is byte-identical to what WRF
+4.7.1 expects — it adds the WVT changes and nothing else (`mp_wsm6.F90` +1100, `cu_ntiedtke.F90`
++440, `bl_ysu.F90` +12). MMM-physics `main` has since moved 19 commits ahead and altered
+`bl_ysu.F90`; it is deliberately not used.
 
-Two practical consequences:
+**This repo tracks no files under `phys/physics_mmm/`**, exactly as upstream does. To build:
 
-- **Running the externals checkout in this working tree will overwrite those three files.** This
-  tree carries only the 3 WVT-modified files, not the external's full set, so it is also not
-  self-sufficient for a build. Build from the Docker overlay instead.
-- The `wrf-4.7.1-base` branch exists because those files are generated/external: it holds them at
-  their stock 4.7.1 content so the WVT delta against them is isolable. `git diff wrf-4.7.1-base`
-  on that directory is the real change.
+```bash
+git clone -b feature/water-vapor-tracers https://github.com/mullenkamp/WRF.git
+cd WRF
+./tools/manage_externals/checkout_externals -e arch/Externals.cfg   # note: -e, it is not at the root
+./configure && ./compile em_real
+```
+
+**Consequences for an upstream PR.** The WVT work is in two halves and both are required: the
+Registry, driver and dynamics changes here, and the three physics schemes in the external. A PR
+against `wrf-model/WRF` alone cannot deliver the WSM6/YSU/New Tiedtke changes — those need a
+coordinated PR to `NCAR/MMM-physics`, and the `arch/Externals.cfg` change here would be reverted to
+point back at whatever tag upstream settles on.
+
+**One historical wrinkle:** the `wvt-4.7.1-single-region` tag predates this restructuring and still
+carries the three files as tracked content. A clone *at that tag* therefore hits the old conflict —
+`checkout_externals` refuses to populate a directory that already exists with tracked files in it.
+The tag is a provenance marker, not a build target.
 
 ## Related documentation
 
