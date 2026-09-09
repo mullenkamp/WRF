@@ -20,6 +20,7 @@ CONTAINS
                      ,ccldfra,convcld,qcconv,qiconv                   &
                      ,bmj_rad_feedback                                & 
                      ,rainc,tr_rainc,raincv,pratec,tr_pratec,nca      & ! wvt
+                     ,tr_capcre,tr_capdes                             & ! wvt
                      ,cldfra_dp,cldfra_sh                             &
                      ,udr_kf,ddr_kf,uer_kf,der_kf,timec_kf,kf_edrates & !kf_edrates
                      ,QC_CU,QI_CU                                     &
@@ -504,6 +505,8 @@ CONTAINS
    INTEGER, INTENT(IN) :: num_wvt_regions                            ! wvt
    REAL, DIMENSION( ims:ime, kms:kme, jms:jme, * ), OPTIONAL, INTENT(IN) :: tr_block  ! wvt: contiguous tracer block (cu_ntiedtke)
    REAL, DIMENSION( ims:ime, num_wvt_regions, jms:jme ), INTENT(INOUT) :: TR_RAINC    ! wvt: per-region (i,n,j)
+!--- wvt: accumulated tag mass created/destroyed by the one-sided caps, per region (kg m-2)
+   REAL, DIMENSION( ims:ime, num_wvt_regions, jms:jme ), INTENT(INOUT) :: TR_CAPCRE, TR_CAPDES ! wvt
    REAL, DIMENSION( ims:ime , jms:jme ),                         &
           INTENT(INOUT) ::                                RAINC  &
                                                     ,    RAINCV  &
@@ -1508,6 +1511,7 @@ CONTAINS
                ,tr_block=tr_block,num_wvt_regions=num_wvt_regions & ! wvt
                ,tr_pratec=tr_tmppratec                           & ! wvt
                ,tr_rainc=tr_rainc                                & ! wvt
+               ,tr_capcre=tr_capcre, tr_capdes=tr_capdes         & ! wvt
                ,rtrqvcuten=rtrqvcuten                            & ! wvt
                ,rtrqccuten=rtrqccuten                            & ! wvt
                ,rtrqicuten=rtrqicuten                            & ! wvt
@@ -1518,6 +1522,10 @@ CONTAINS
                ,rtrqvcuten_06=grid%rtrqvcuten_06,rtrqccuten_06=grid%rtrqccuten_06,rtrqicuten_06=grid%rtrqicuten_06 & ! wvt 1d-b region 06
                ,rtrqvcuten_07=grid%rtrqvcuten_07,rtrqccuten_07=grid%rtrqccuten_07,rtrqicuten_07=grid%rtrqicuten_07 & ! wvt 1d-b region 07
                ,rtrqvcuten_08=grid%rtrqvcuten_08,rtrqccuten_08=grid%rtrqccuten_08,rtrqicuten_08=grid%rtrqicuten_08 & ! wvt 1d-b region 08
+               ,rtrqvcuten_09=grid%rtrqvcuten_09,rtrqccuten_09=grid%rtrqccuten_09,rtrqicuten_09=grid%rtrqicuten_09 & ! wvt 1d-b region 09
+               ,rtrqvcuten_10=grid%rtrqvcuten_10,rtrqccuten_10=grid%rtrqccuten_10,rtrqicuten_10=grid%rtrqicuten_10 & ! wvt 1d-b region 10
+               ,rtrqvcuten_11=grid%rtrqvcuten_11,rtrqccuten_11=grid%rtrqccuten_11,rtrqicuten_11=grid%rtrqicuten_11 & ! wvt 1d-b region 11
+               ,rtrqvcuten_12=grid%rtrqvcuten_12,rtrqccuten_12=grid%rtrqccuten_12,rtrqicuten_12=grid%rtrqicuten_12 & ! wvt 1d-b region 12
                ,f_tr_qv=flag_tr_qv                               & ! wvt
                                                              )
 

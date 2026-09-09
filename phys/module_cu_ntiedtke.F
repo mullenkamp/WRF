@@ -32,6 +32,7 @@
                 ,errmsg,errflg                           &
                 ,tr_block,num_wvt_regions                  & ! wvt
                 ,tr_pratec,tr_rainc                        & ! wvt
+                ,tr_capcre,tr_capdes                       & ! wvt
                 ,rtrqvcuten,rtrqccuten,rtrqicuten          & ! wvt
                 ,rtrqvcuten_02,rtrqccuten_02,rtrqicuten_02  & ! wvt 1d-b region 02
                 ,rtrqvcuten_03,rtrqccuten_03,rtrqicuten_03  & ! wvt 1d-b region 03
@@ -40,6 +41,10 @@
                 ,rtrqvcuten_06,rtrqccuten_06,rtrqicuten_06  & ! wvt 1d-b region 06
                 ,rtrqvcuten_07,rtrqccuten_07,rtrqicuten_07  & ! wvt 1d-b region 07
                 ,rtrqvcuten_08,rtrqccuten_08,rtrqicuten_08  & ! wvt 1d-b region 08
+                ,rtrqvcuten_09,rtrqccuten_09,rtrqicuten_09  & ! wvt 1d-b region 09
+                ,rtrqvcuten_10,rtrqccuten_10,rtrqicuten_10  & ! wvt 1d-b region 10
+                ,rtrqvcuten_11,rtrqccuten_11,rtrqicuten_11  & ! wvt 1d-b region 11
+                ,rtrqvcuten_12,rtrqccuten_12,rtrqicuten_12  & ! wvt 1d-b region 12
                 ,f_tr_qv)                                    ! wvt
 !=================================================================================================================
 !-- u3d         3d u-velocity interpolated to theta points (m/s)
@@ -158,10 +163,18 @@
     rtrqvcuten_05, rtrqccuten_05, rtrqicuten_05, &
     rtrqvcuten_06, rtrqccuten_06, rtrqicuten_06, &
     rtrqvcuten_07, rtrqccuten_07, rtrqicuten_07, &
-    rtrqvcuten_08, rtrqccuten_08, rtrqicuten_08
+    rtrqvcuten_08, rtrqccuten_08, rtrqicuten_08, &
+    rtrqvcuten_09, rtrqccuten_09, rtrqicuten_09, &
+    rtrqvcuten_10, rtrqccuten_10, rtrqicuten_10, &
+    rtrqvcuten_11, rtrqccuten_11, rtrqicuten_11, &
+    rtrqvcuten_12, rtrqccuten_12, rtrqicuten_12
  real(kind=kind_phys),intent(inout),dimension(ims:ime,num_wvt_regions,jms:jme),optional:: & ! wvt: per-region
     tr_pratec,   &                                                                        ! wvt
-    tr_rainc                                                                               ! wvt
+    tr_rainc,    &                                                                        ! wvt
+!--- wvt: column-integrated tag mass the one-sided caps create/destroy, per region. Makes the
+!--- wvt: structural redistribution a REPORTED quantity per run rather than an assumed one.
+    tr_capcre,   &                                                                        ! wvt
+    tr_capdes                                                                              ! wvt
  logical,intent(in),optional:: f_tr_qv                                                     ! wvt
 
 !--- local variables and arrays:
@@ -190,6 +203,7 @@
  real(kind=kind_phys),dimension(its:ite,kts:kte):: tr_qv_hv                                ! wvt
  real(kind=kind_phys),dimension(its:ite,kts:kte):: tr_qc_hv, tr_qi_hv                     ! wvt
  real(kind=kind_phys),dimension(its:ite):: tr_pratec_hv                                    ! wvt
+ real(kind=kind_phys),dimension(its:ite,kts:kte):: tr_capcre_hv, tr_capdes_hv              ! wvt
 
 !-----------------------------------------------------------------------------------------------------------------
 
@@ -264,7 +278,13 @@
           enddo                                                                             ! wvt
        enddo                                                                                ! wvt
        do i = its,ite                                                                       ! wvt
-          tr_pratec_hv(i) = 0.0                                                             ! wvt - zero before call, not accumulated
+          tr_pratec_hv(i) = 0.0                                                             ! wvt
+       enddo                                                                                ! wvt
+       do k = kts,kte                                                                       ! wvt
+          do i = its,ite                                                                    ! wvt
+             tr_capcre_hv(i,k) = 0.0                                                        ! wvt
+             tr_capdes_hv(i,k) = 0.0                                                        ! wvt
+          enddo                                                                             ! wvt - zero before call, not accumulated
        enddo                                                                                ! wvt
     endif                                                                                   ! wvt
 
@@ -291,6 +311,7 @@
                      dt   = delt   , dx   = dx_hv  , errmsg = errmsg  , errflg = errflg  , & ! wvt
                      tr_qv = tr_qv_hv , tr_qc = tr_qc_hv , tr_qi = tr_qi_hv ,              & ! wvt
                      tr_pratec = tr_pratec_hv ,                                             & ! wvt
+                     tr_cap_cre = tr_capcre_hv , tr_cap_des = tr_capdes_hv ,                & ! wvt
                      do_tracers = l_do_tracers                                               & ! wvt
                         )
 
@@ -426,6 +447,51 @@
                 enddo                                                                         ! wvt
              enddo                                                                            ! wvt
           endif                                                                               ! wvt
+       case (9)                                                                              ! wvt
+          if (present(rtrqvcuten_09)) then                                                    ! wvt
+             do k = kts,kte                                                                   ! wvt
+                do i = its,ite                                                                ! wvt
+                   rtrqvcuten_09(i,k,j) = (tr_qv_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+1))/(dt*stepcu)  ! wvt
+                   rtrqccuten_09(i,k,j) = (tr_qc_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+2))/(dt*stepcu)  ! wvt
+                   rtrqicuten_09(i,k,j) = (tr_qi_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+4))/(dt*stepcu)  ! wvt
+                enddo                                                                         ! wvt
+             enddo                                                                            ! wvt
+          endif                                                                               ! wvt
+       case (10)                                                                              ! wvt
+          if (present(rtrqvcuten_10)) then                                                    ! wvt
+             do k = kts,kte                                                                   ! wvt
+                do i = its,ite                                                                ! wvt
+                   rtrqvcuten_10(i,k,j) = (tr_qv_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+1))/(dt*stepcu)  ! wvt
+                   rtrqccuten_10(i,k,j) = (tr_qc_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+2))/(dt*stepcu)  ! wvt
+                   rtrqicuten_10(i,k,j) = (tr_qi_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+4))/(dt*stepcu)  ! wvt
+                enddo                                                                         ! wvt
+             enddo                                                                            ! wvt
+          endif                                                                               ! wvt
+       case (11)                                                                              ! wvt
+          if (present(rtrqvcuten_11)) then                                                    ! wvt
+             do k = kts,kte                                                                   ! wvt
+                do i = its,ite                                                                ! wvt
+                   rtrqvcuten_11(i,k,j) = (tr_qv_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+1))/(dt*stepcu)  ! wvt
+                   rtrqccuten_11(i,k,j) = (tr_qc_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+2))/(dt*stepcu)  ! wvt
+                   rtrqicuten_11(i,k,j) = (tr_qi_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+4))/(dt*stepcu)  ! wvt
+                enddo                                                                         ! wvt
+             enddo                                                                            ! wvt
+          endif                                                                               ! wvt
+       case (12)                                                                              ! wvt
+          if (present(rtrqvcuten_12)) then                                                    ! wvt
+             do k = kts,kte                                                                   ! wvt
+                do i = its,ite                                                                ! wvt
+                   rtrqvcuten_12(i,k,j) = (tr_qv_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+1))/(dt*stepcu)  ! wvt
+                   rtrqccuten_12(i,k,j) = (tr_qc_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+2))/(dt*stepcu)  ! wvt
+                   rtrqicuten_12(i,k,j) = (tr_qi_hv(i,kte-k+kts) - tr_block(i,k,j,ib_wvt+4))/(dt*stepcu)  ! wvt
+                enddo                                                                         ! wvt
+             enddo                                                                            ! wvt
+          endif                                                                               ! wvt
+       case default                                                                          ! wvt
+          ! wvt: n_wvt exceeds the compiled member count. Without this branch the ladder
+          ! above silently stores NO convective tracer tendency for the extra regions --
+          ! the run completes and the attribution is quietly wrong. Fail instead.
+          CALL wrf_error_fatal ( '--- ERROR: num_wvt_regions exceeds the compiled rtrq*cuten members in module_cu_ntiedtke.F' )
        end select                                                                          ! wvt
     endif                                                                                   ! wvt
 
@@ -433,6 +499,12 @@
     if (l_do_tracers) then                                                                 ! wvt
        do i = its,ite                                                                      ! wvt
           tr_pratec(i,n_wvt,j) = tr_pratec_hv(i)                                           ! wvt
+          do k = kts,kte                                                                    ! wvt
+             tr_capcre(i,n_wvt,j) = tr_capcre(i,n_wvt,j)                                  & ! wvt
+     &          + tr_capcre_hv(i,k)*rho3d(i,k,j)*dz8w(i,k,j)                                ! wvt
+             tr_capdes(i,n_wvt,j) = tr_capdes(i,n_wvt,j)                                  & ! wvt
+     &          + tr_capdes_hv(i,k)*rho3d(i,k,j)*dz8w(i,k,j)                                ! wvt
+          enddo                                                                             ! wvt
        enddo                                                                               ! wvt
     endif                                                                                  ! wvt
 

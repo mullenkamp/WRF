@@ -44,7 +44,9 @@ def main():
     for n in regions:
         for sp, q, _off, _p in SPECIES:
             name = f"RTRQ{sp.upper()}CUTEN_{n:02d}"
-            print(f'state    real  {name:17s} ikj      misc        1         -      r        '
+            # rh, not r: the per-region tendencies go to HISTORY so that
+            # sum_n RTRQVCUTEN_n == RQVCUTEN is checkable on real output, not just at restart.
+            print(f'state    real  {name:17s} ikj      misc        1         -      rh       '
                   f'"{name}"     "COUPLED TRACER {q} TENDENCY DUE TO CUMULUS SCHEME, region {n:02d}"   "Pa kg kg-1 s-1"')
     print()
 
@@ -117,20 +119,23 @@ def main():
     print()
 
     print("==== SECTION 8: solve_em.F DECOUPLE block (after the phy_prep_part2 tile loop ENDDO) ====")
+    # NB: this block sits one level shallower in solve_em.F than the part2 blocks above
+    # (S6/S7), so it is emitted at the indentation the committed code actually uses. Keep it
+    # that way -- gen-vs-committed is diffed verbatim by check_generators.sh.
     print("! wvt 1d-b: decouple convective tracer tendencies for regions 2..N (mirrors phy_prep_part2 region 1).")
-    print("      IF (P_QV_TR .ge. PARAM_FIRST_SCALAR) THEN")
+    print("   IF (P_QV_TR .ge. PARAM_FIRST_SCALAR) THEN")
     for n in regions:
-        print(f"         IF (config_flags%num_wvt_regions >= {n}) THEN")
-        print("            DO j = jps, MIN(jpe,jde-1)")
-        print("            DO k = kps, MIN(kpe,kde-1)")
-        print("            DO i = ips, MIN(ipe,ide-1)")
+        print(f"      IF (config_flags%num_wvt_regions >= {n}) THEN")
+        print("         DO j = jps, MIN(jpe,jde-1)")
+        print("         DO k = kps, MIN(kpe,kde-1)")
+        print("         DO i = ips, MIN(ipe,ide-1)")
         for sp, *_ in SPECIES:
-            print(f"               grid%{fld(sp, n)}(i,k,j) = grid%{fld(sp, n)}(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))")
-        print("            ENDDO")
-        print("            ENDDO")
-        print("            ENDDO")
-        print("         ENDIF")
-    print("      ENDIF")
+            print(f"            grid%{fld(sp, n)}(i,k,j) = grid%{fld(sp, n)}(i,k,j)/(grid%c1h(k)*grid%muts(i,j)+grid%c2h(k))")
+        print("         ENDDO")
+        print("         ENDDO")
+        print("         ENDDO")
+        print("      ENDIF")
+    print("   ENDIF")
     print()
 
 
