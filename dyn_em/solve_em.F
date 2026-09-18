@@ -3976,6 +3976,8 @@ BENCH_START(micro_driver_tim)
       &        , QNDROP_CURR=scalar(ims,kms,jms,P_QNDROP), F_QNDROP=F_QNDROP &
       &        , tr_block=tracer(ims,kms,jms,P_QV_TR), F_TR_QV=F_QV_TR    &  ! wvt: contiguous moisture-tracer block (base=P_QV_TR)
       &        , num_wvt_regions=config_flags%num_wvt_regions             &  ! wvt
+      &        , TR_MPCRE=grid%tr_mpcre, TR_MPDES=grid%tr_mpdes            & ! wvt
+      &        , TR_MPRED=grid%tr_mpred                                     & ! wvt
       &        , TR_RAINNC=grid%tr_rainnc, TR_SNOWNC=grid%tr_snownc       &
       &        , TR_GRAUPELNC=grid%tr_graupelnc                           &
 #if (WRF_CHEM == 1)
@@ -4531,7 +4533,7 @@ BENCH_END(moist_phys_end_tim)
 
 ! wvt: now make tracer moisture variables equal to the full moisture species in the the source region, if specified
 
-     IF ( config_flags%tracer3dsource == 1 ) then
+     IF ( config_flags%tracer3dsource == 1 .AND. P_QV_TR .ge. PARAM_FIRST_SCALAR ) then   ! wvt: trmask3d is packaged on tracer_opt==4
        DO jj = jps, MIN(jpe,jde-1)
          DO kk = kps, MIN(kpe,kde-1)
            DO ii = ips, MIN(ipe,ide-1)
@@ -4631,7 +4633,7 @@ BENCH_END(moist_phys_end_tim)
 
 ! wvt: now make moist tracer variables equal to zero in the secondary trmask3d (trmask3d2 => the sink region), if specified
 
-     IF ( config_flags%tracer3dsink == 1 ) then
+     IF ( config_flags%tracer3dsink == 1 .AND. P_QV_TR .ge. PARAM_FIRST_SCALAR ) then    ! wvt: trmask3d2 likewise
        DO jj = jps, MIN(jpe,jde-1)
          DO kk = kps, MIN(kpe,kde-1)
            DO ii = ips, MIN(ipe,ide-1)

@@ -46,6 +46,8 @@ CONTAINS
                      ,history_interval                                &
                      ,itimestep                                       &
                      ,cu_used, shcu_used, acc_phy_tend                &
+                     ,TR_MPCRE,TR_MPDES,TR_MPRED                       & ! Optional (WVT)
+                     ,I_TR_MPCRE,I_TR_MPDES,I_TR_MPRED                 & ! Optional (WVT)
                      ,TR_RAINC,TR_RAINNC                               & ! Optional (WVT)
                      ,TR_CAPCRE,TR_CAPDES                              & ! Optional (WVT)
                      ,I_TR_RAINC,I_TR_RAINNC                           & ! Optional (WVT)
@@ -54,6 +56,7 @@ CONTAINS
 !----------------------------------------------------------------------
 
   USE module_dm, ONLY: wrf_dm_sum_real, wrf_dm_maxval
+  USE module_state_description, ONLY: P_QV_TR, PARAM_FIRST_SCALAR   ! wvt: gate for the packaged fields
 
   IMPLICIT NONE
 !======================================================================
@@ -206,6 +209,8 @@ CONTAINS
    ! WVT tracer bucketed accumulators (optional, engaged when BUCKET_MM > 0)
    REAL, DIMENSION( ims:, :, jms: ), OPTIONAL, INTENT(INOUT) :: TR_RAINC          ! wvt: per-region (i,n,j)
    REAL, DIMENSION( ims:, :, jms: ), OPTIONAL, INTENT(INOUT) :: TR_CAPCRE, TR_CAPDES ! wvt
+   REAL, DIMENSION( ims:, :, jms: ), OPTIONAL, INTENT(INOUT) :: TR_MPCRE, TR_MPDES, TR_MPRED ! wvt
+   INTEGER, DIMENSION( ims:, :, jms: ), OPTIONAL, INTENT(INOUT) :: I_TR_MPCRE, I_TR_MPDES, I_TR_MPRED ! wvt
    REAL, DIMENSION( ims:, :, jms: ), OPTIONAL, INTENT(INOUT) :: TR_RAINNC          ! wvt: per-region (i,n,j)
    INTEGER, DIMENSION( ims:, :, jms: ), OPTIONAL, INTENT(INOUT) :: I_TR_RAINC      ! wvt: per-region (i,n,j)
    INTEGER, DIMENSION( ims:, :, jms: ), OPTIONAL, INTENT(INOUT) :: I_TR_CAPCRE, I_TR_CAPDES ! wvt
@@ -332,6 +337,10 @@ CONTAINS
       ENDDO
       ENDDO
 
+      ! wvt (2026-09-18): the four WVT bucket blocks below index Registry-PACKAGED fields
+      ! that are size-1 dummies with tracers off; SIZE(..,2) bounds only the region axis,
+      ! so the whole set is gated on P_QV_TR (the same test module_diag_wvt_columns uses).
+      IF (P_QV_TR .ge. PARAM_FIRST_SCALAR) THEN
       ! WVT tracer precip bucket wrap — mirrors the RAINC/RAINNC block above.
       IF (PRESENT(TR_RAINNC) .AND. PRESENT(I_TR_RAINNC)) THEN
         IF (xtime .eq. 0.0) THEN
@@ -349,6 +358,43 @@ CONTAINS
           IF (tr_rainnc(i,n_tr,j) .gt. bucket_mm) THEN
             tr_rainnc(i,n_tr,j)   = tr_rainnc(i,n_tr,j) - bucket_mm
             i_tr_rainnc(i,n_tr,j) = i_tr_rainnc(i,n_tr,j) + 1
+          ENDIF
+        ENDDO
+        ENDDO
+        ENDDO
+      ENDIF
+
+!--- wvt: bucket the three MICROPHYSICS cap accumulators. Same treatment as the cumulus pair
+!--- wvt: above; the I_* counter must exist from the FIRST archived frame because cfdb-ingest
+!--- wvt: probes for I_<var> in the first file only and silently drops the bucket term otherwise.
+!--- wvt: The three are bucketed SEPARATELY because they are separate fields -- see the Registry
+!--- wvt: comment for why summing redistributive, destructive and creative mass is meaningless.
+      IF (PRESENT(TR_MPCRE) .AND. PRESENT(I_TR_MPCRE)) THEN
+        IF (xtime .eq. 0.0) THEN
+          DO n_tr=1,SIZE(tr_mpcre,2)
+          DO j=j_start(ij),j_end(ij)
+          DO i=i_start(ij),i_end(ij)
+            i_tr_mpcre(i,n_tr,j) = 0
+            i_tr_mpdes(i,n_tr,j) = 0
+            i_tr_mpred(i,n_tr,j) = 0
+          ENDDO
+          ENDDO
+          ENDDO
+        ENDIF
+        DO n_tr=1,SIZE(tr_mpcre,2)
+        DO j=j_start(ij),j_end(ij)
+        DO i=i_start(ij),i_end(ij)
+          IF (tr_mpcre(i,n_tr,j) .gt. bucket_mm) THEN
+            tr_mpcre(i,n_tr,j)   = tr_mpcre(i,n_tr,j) - bucket_mm
+            i_tr_mpcre(i,n_tr,j) = i_tr_mpcre(i,n_tr,j) + 1
+          ENDIF
+          IF (tr_mpdes(i,n_tr,j) .gt. bucket_mm) THEN
+            tr_mpdes(i,n_tr,j)   = tr_mpdes(i,n_tr,j) - bucket_mm
+            i_tr_mpdes(i,n_tr,j) = i_tr_mpdes(i,n_tr,j) + 1
+          ENDIF
+          IF (tr_mpred(i,n_tr,j) .gt. bucket_mm) THEN
+            tr_mpred(i,n_tr,j)   = tr_mpred(i,n_tr,j) - bucket_mm
+            i_tr_mpred(i,n_tr,j) = i_tr_mpred(i,n_tr,j) + 1
           ENDIF
         ENDDO
         ENDDO
@@ -407,6 +453,7 @@ CONTAINS
         ENDDO
         ENDDO
       ENDIF
+      ENDIF   ! wvt P_QV_TR
 
       IF (xtime .eq. 0.0 .and. bucket_J .gt. 0.0 .and. PRESENT(ACSWUPT))THEN
         DO j=j_start(ij),j_end(ij)

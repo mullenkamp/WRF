@@ -3098,8 +3098,36 @@
                END IF
             END IF
 
+! wvt: WENO-5 with a positive-definite limiter is the scheme the WVT METHOD PRESCRIBES, not a
+!      local preference. Insua-Costa, D. & Miguez-Macho, G. (2018), "A new moisture tagging
+!      capability in the Weather Research and Forecasting model", Earth Syst. Dynam. 9, 167-185
+!      -- the implementation vendored here (modules_tracers_4.3.3.tar) -- section 2:
+!        "Moisture and tracer advection are calculated with the fifth-order weighted essentially
+!         non-oscillatory (WENO) scheme with a positive definite limiter."
+!        "It is important to use an advection numerical scheme that is positive definite, conserves
+!         mass and minimizes numerical diffusion, in order to limit numerical errors in WVT
+!         calculations. Both total moisture and tagged moisture must use the same scheme."
+!      Three criteria. moist/tracer_adv_opt=1 meets the first two and FAILS the third -- it is
+!      5th order horizontally but only v_sca_adv_order (default 3) vertically, while WENO ignores
+!      both order switches and is 5th order in each direction. So option 1 is NOT an equivalent
+!      alternative, and this guard is not merely pinning whatever the runs happened to use.
+!      See also the moist_adv_opt guard below, which enforces the "same scheme" half empirically.
             IF ( model_config_rec % tracer_adv_opt(i) .NE. 4 ) THEN
-               wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) requires tracer_adv_opt=4'
+               wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) requires tracer_adv_opt=4 '// &
+                                 '(WENO-PD; Insua-Costa & Miguez-Macho 2018)'
+               CALL wrf_message ( wrf_err_message )
+               count_fatal_error = count_fatal_error + 1
+            END IF
+
+! wvt: base moisture and its tags must ride the SAME advection limiter. With moist_adv_opt=1
+!      (positive-definite) against tracer_adv_opt=4 (WENO positive-definite), sum_n tr_qX
+!      overshoots qX at every sharp cloud edge and the WSM6 entry caps discard the excess --
+!      measured at 12 regions as 15% of tagged precipitation returned to vapour and 10% of
+!      NZ-land rain left untagged; matching the limiter took those to 0.2% and 1.7%
+!      (wsm6_caps A/B, 2026-09-13; docs/wvt_wsm6_tagging.md in wrf-model-eval). Nothing
+!      downstream can see the mismatch without the TR_MP* diagnostics, so refuse it here.
+            IF ( model_config_rec % moist_adv_opt(i) .NE. 4 ) THEN
+               wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) requires moist_adv_opt=4 (same limiter as tracer_adv_opt)'
                CALL wrf_message ( wrf_err_message )
                count_fatal_error = count_fatal_error + 1
             END IF
@@ -3144,13 +3172,49 @@
                   CALL wrf_message ( wrf_err_message )
                   count_fatal_error = count_fatal_error + 1
                END IF
+! wvt: only New Tiedtke is wired per region. module_cumulus_driver passes tr_tmppratec(:,1,:)
+!      and region 1's tracer vapour to every other cumulus scheme, so with KF/MSKF regions 2..N
+!      get no convective rain-out and no convective depletion of their vapour -- and nothing
+!      else fails. Measured 2026-09-16 (P1 chain arm D, KF, 4 regions): tagged convective rain
+!      exactly 0 for regions 2-4, region 2's tagged rain 35% of the single-region reference.
+               IF ( model_config_rec % cu_physics(i) .NE. 0 .AND. &
+                    model_config_rec % cu_physics(i) .NE. NTIEDTKESCHEME ) THEN
+                  wrf_err_message = '--- ERROR: num_wvt_regions>1 requires cu_physics=16 (NTiedtke) or 0: '// &
+                                    'other cumulus schemes tag region 1 only'
+                  CALL wrf_message ( wrf_err_message )
+                  count_fatal_error = count_fatal_error + 1
+               END IF
             END IF
 
 ! wvt: num_wvt_regions>1 is only valid with WVT active. Without tracer_opt=4 the cumulative
 !      num_wvt_regions==N packages would activate regions 2.. without the tracer_opt-gated
 !      region 1, leaving a non-contiguous active tracer block.
-         ELSE IF ( model_config_rec % num_wvt_regions .GT. 1 ) THEN
-            wrf_err_message = '--- ERROR: num_wvt_regions>1 requires tracer_opt=4 (WVT)'
+         ELSE
+            IF ( model_config_rec % num_wvt_regions .GT. 1 ) THEN
+               wrf_err_message = '--- ERROR: num_wvt_regions>1 requires tracer_opt=4 (WVT)'
+               CALL wrf_message ( wrf_err_message )
+               count_fatal_error = count_fatal_error + 1
+            END IF
+! wvt (2026-09-18): the WVT state (TRMASK, TRMASK3D/3D2, the TR_* accumulators, ...) is
+!      Registry-packaged on tracer_opt==4. A source/sink switch without tracer_opt=4 would reach
+!      solve_em's mask loops with size-1 dummies; refuse it here, where it is a namelist error.
+            IF ( model_config_rec % tracer2dsource(i) .NE. 0 .OR. &
+                 model_config_rec % tracer3dsource(i) .NE. 0 .OR. &
+                 model_config_rec % tracer3dsink(i)   .NE. 0 ) THEN
+               wrf_err_message = '--- ERROR: tracer2dsource/tracer3dsource/tracer3dsink require tracer_opt=4 (WVT)'
+               CALL wrf_message ( wrf_err_message )
+               count_fatal_error = count_fatal_error + 1
+            END IF
+         END IF
+! wvt (2026-09-18): tracer_opt is per domain, and so is the allocation of every packaged WVT
+!      field -- but the two sides of a nest exchange each test only their OWN array size
+!      (generated nest interp/feedback and RSL_LITE pack/unpack), so tracer_opt = 4, 0 would
+!      pack a full parent field that the nest side never unpacks. Require one value on every
+!      domain WHEN WVT IS INVOLVED. Stock tracer_opt (1, 2, 3) is legitimately per-domain and
+!      is left alone (review round wvt-pkg-code-1).
+         IF ( ( model_config_rec % tracer_opt(i) .EQ. 4 .OR. model_config_rec % tracer_opt(1) .EQ. 4 ) .AND. &
+              model_config_rec % tracer_opt(i) .NE. model_config_rec % tracer_opt(1) ) THEN
+            wrf_err_message = '--- ERROR: tracer_opt=4 (WVT) must be set on every domain or none (WVT fields are per-domain packaged)'
             CALL wrf_message ( wrf_err_message )
             count_fatal_error = count_fatal_error + 1
          END IF

@@ -1,7 +1,10 @@
-! moist_adv_opt = 4 MATCHES tracer_adv_opt. Originally the control arm for gate 3a against .n12
-! (which carried production's 1; the two differed by ~1e-4 in tagged fraction over 3 h, 2026-09-06).
-! Since 2026-09-13 .n12 also carries 4 (Ruling H; check_a_mundo refuses 1 from image 2.4), so this
-! file is identical to it apart from this header and is kept only because records cite it by name.
+! Tracer-off variant of namelist.input.notracer (2026-09-18, packaging gate): bl_pbl_physics = 1 (YSU), tracer_pblmix = 0
+! Exercises the YSU tracer path (RTRQ*BLTEN / TRQFX dummies) with tracers off. km_opt = 4 because
+! SMS-3DTKE (km_opt = 5) refuses any bl_pbl_physics /= 0. Otherwise identical to .notracer.
+! moist_adv_opt = 4, the pipeline default since Ruling H (2026-09-13) and what .n12 now carries.
+! tracer_opt = 0 here, so check_a_mundo's moist_adv_opt guard does not apply -- but the tracers-off
+! base must match the tracers-on base for the bit-identity gate to mean anything, so this follows
+! .n12. (Until 2026-09-13 both carried production's 1.)
 &time_control
     adjust_output_times = .true.
     auxinput4_inname = 'wrflowinp_d<domain>'
@@ -68,7 +71,7 @@
 /
 
 &physics
-    bl_pbl_physics = 0
+    bl_pbl_physics = 1
     bldt = 0
     cu_physics = 16
     cudt = 5
@@ -85,7 +88,7 @@
     sf_urban_physics = 0
     sst_skin = 0
     sst_update = 1
-    tracer_pblmix = 1
+    tracer_pblmix = 0
     usemonalb = .true.
 /
 
@@ -103,18 +106,17 @@
     gwd_opt = 1
     hybrid_opt = 2
     khdif = 0
-    km_opt = 5
+    km_opt = 4
     kvdif = 0
     moist_adv_opt = 4
     non_hydrostatic = .true.
     scalar_adv_opt = 1
-    tracer_opt = 4
+    tracer_opt = 0
     tracer_adv_opt = 4
-    tracer2dsource = 1
+    tracer2dsource = 0
     tracer3dsource = 0
     tracer3dsink = 0
-    num_wvt_regions = 12
-    num_wvt_bdy_regions = 4
+    num_wvt_regions = 1
     w_damping = 1
     zdamp = 5000.0
 /
